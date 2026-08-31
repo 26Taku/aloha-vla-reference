@@ -124,8 +124,10 @@ LeRobotではrobotを共通interfaceとして扱い、observationの取得とact
 - baseline datasetの14-dimensional action / 14-dimensional observation state
 - Trossen側のexternal effortを追加した28-dimensional observation stateの保存
 - 保存後datasetのmetadata / Parquet / videoのvalidation
+- MMS101 ROS 2 streamのnative-rate取得（約100 Hz）とALOHA frameへのcausal alignment
+- GelSight Miniのnative MJPEG取得（実効18.753 Hz）とALOHA 30 Hz recordingへのcausal alignment
 
-`external effort` の確認は、LeRobot内で状態量を追加した場合にDatasetまで反映されることを確認したものであり、MMS101等の独立した外部sensorの統合を実証したものではない。
+`external effort` はTrossen driver内部のstate extension確認である。独立した外部sensorについては別経路として、raw acquisition + host timestamp + derived alignmentを実機確認した。詳細は `docs/03_architecture_and_extension.md` と `docs/06_validation_results.md` を参照する。
 
 ---
 

@@ -9,7 +9,7 @@ Trossen Robotics公式のLeRobot Pluginをベースに、研究室のALOHAで実
 - VLA向けデータ収集に使用する標準構成
 - 環境構築からteleoperation、recordingまでの手順
 - 収録したDatasetの確認方法
-- カメラや外部センサを追加する際に確認する箇所
+- カメラや外部センサを追加する際の標準architectureとreference実装
 - 実機検証中に確認した問題と対処方法
 
 ## 1. 対象
@@ -45,6 +45,8 @@ VLA・模倣学習
 - LeRobotDataset v3.0形式での保存
 
 詳細な構成は [docs/01_reference_stack.md](docs/01_reference_stack.md) を参照してください。
+
+外部sensorについては、MMS101相当の高周期numeric streamとGelSight Miniを用いて、native-rate acquisitionとcausal timestamp alignmentまで実機確認しています。標準baselineのsetupにROS 2やGelSight固有softwareを必須化せず、optional referenceとして `examples/custom_sensor/` に分離しています。
 
 ## 3. Quick Start
 
@@ -115,7 +117,20 @@ Rerun Viewerを確認しながら、以下を確認します。
 
 Dataset metadata、Parquet、frame数、timestamp、camera videoなどを確認し、問題がなければPASSを表示します。
 
-## 4. 次に読む資料
+## 4. Optional external sensors
+
+robot FPSと取得周期が異なるsensorを追加する場合は、まず [examples/custom_sensor/README.md](examples/custom_sensor/README.md) と [docs/03_architecture_and_extension.md](docs/03_architecture_and_extension.md) を参照してください。
+
+標準原則は、raw sensorを無理に30 Hzへ落とさず、raw dataと実timestampを保持し、policy用の同期表現を後処理で生成することです。
+
+```text
+High-rate numeric sensor -> native-rate JSONL -> causal current/history view
+Async camera             -> native compressed video -> causal latest-frame view
+```
+
+これらはbaseline Quick Startとは独立したoptional extensionです。
+
+## 5. 次に読む資料
 
 - [Reference Stack](docs/01_reference_stack.md): 使用するsoftware構成、version、研究室固有設定
 - [Data Collection](docs/02_data_collection.md): teleoperation、recording、Datasetの詳細
@@ -124,8 +139,8 @@ Dataset metadata、Parquet、frame数、timestamp、camera videoなどを確認�
 - [Maintenance](docs/05_maintenance.md): version更新時の確認方法
 - [Validation Results](docs/06_validation_results.md): 実機で確認済みの範囲
 
-## 5. Verification scope
+## 6. Verification scope
 
 本リポジトリでは、実際に研究室のALOHAで確認した内容と、設計・コード調査のみの内容を区別して記載します。
 
-特に外付け力覚センサなどの追加については、ALOHA標準構成で確認済みの部分と、今後実機確認が必要な部分を区別します。
+実機確認済みのbaselineに加え、高周期F/T streamと非同期GelSight cameraについて、同一host clockによるconcurrent acquisitionとcausal alignmentを確認しています。hardware-trigger同期、GelSight 2台同時capacity、VLA training/inferenceはPhase 1の検証範囲外です。

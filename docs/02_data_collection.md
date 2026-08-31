@@ -303,9 +303,9 @@ observation.state  28D
 
 この検証は、LeRobotのRobot observationへ追加された数値情報がrecording pipelineを通ってDatasetへ保存されることを確認したものである。
 
-一方で、MMS101のような独立した外部sensorでは、driver、取得周期、buffer、timestamp同期等を別途設計する必要がある。この検証だけで外部sensor統合全体が確認済みという意味ではない。
+独立した外部sensorは、Trossen driver内部のstate extensionとは分けて扱う。Phase 1ではMMS101相当の高周期numeric streamとGelSight Miniを用いて、raw acquisitionをrobot recordingから分離し、同一host monotonic clockによるcausal alignmentを実機確認した。
 
-詳細は `docs/03_architecture_and_extension.md` に記載する。
+外部sensorの取得・alignment手順は `examples/custom_sensor/README.md`、設計理由と検証結果は `docs/03_architecture_and_extension.md` / `docs/06_validation_results.md` に記載する。
 
 ---
 

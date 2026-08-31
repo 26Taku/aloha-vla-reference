@@ -6,14 +6,17 @@
 
 まずALOHA Armの電源状態とPC側network interfaceを確認する。
 
-研究室実機ではArm電源OFF時に4 IPすべてへ到達できず、電源投入後に復旧した。
+実機検証ではArm電源OFF時に設定済みの4 Armすべてへ到達できず、電源投入後に復旧した。
+
+まずtemplateへ設定したIPを確認し、対象ごとにpingする。
 
 ```bash
-ping -c 2 192.168.1.5
-ping -c 2 192.168.1.4
-ping -c 2 192.168.1.3
-ping -c 2 192.168.1.2
+grep -n 'arm_ip_address' config/teleop-local.yaml
+ARM_IP=YOUR_CONFIGURED_ARM_IP
+ping -c 2 "$ARM_IP"
 ```
+
+`<configured-arm-ip>` は実際にconfigへ設定した値へ置き換える。
 
 `check_hardware.sh` のping成功はnetwork reachabilityのみを示す。driverを含む実動作は `teleoperate.sh` で確認する。
 
@@ -29,7 +32,7 @@ ping -c 2 192.168.1.2
 rs-enumerate-devices
 ```
 
-等でdeviceとserialを確認し、`config/teleop-lab.yaml` / `config/record-template.yaml` と照合する。
+等でdeviceとserialを確認し、`config/teleop-local.yaml` / `config/record-local.yaml` と照合する。
 
 USB差し替えやcamera交換時はdevice indexではなくserialを基準にする。
 
@@ -74,16 +77,14 @@ publisher停止をQoS mismatchと誤認しないよう、topic存在とrateを�
 
 ## 8. MMS101の `/dev/mms101_*` aliasがない
 
-研究室の検証機では固定aliasが存在せず、FTDI USB serial adapterが `/dev/serial/by-id/...` に見えていた。
+検証機では固定aliasが存在せず、FTDI USB serial adapterが `/dev/serial/by-id/...` に見えていた。
 
-例として検証時に確認したadapter serial:
-
-```text
-D20192LJ
-DQ014BS7
+```bash
+ls -l /dev/serial/by-id/
+udevadm info --query=property --name=/dev/ttyUSB0 | grep -E 'ID_(MODEL|SERIAL|SERIAL_SHORT)'
 ```
 
-これらはFTDI adapterのidentifierであり、sensor本体固有IDと同義とは限らない。adapter/sensor対応を変更する場合は再確認する。
+`/dev/serial/by-id/` に含まれるidentifierは環境ごとに異なるためrepositoryへ固定値を埋め込まない。また、FTDI adapterのidentifierはsensor本体固有IDと同義とは限らない。adapter/sensor対応を変更する場合は再確認する。
 
 ## 9. UMI側MMS101と別環境のMMS101 rateが違う
 

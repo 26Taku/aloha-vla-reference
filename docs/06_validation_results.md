@@ -35,10 +35,10 @@ Trossen Arm 1.10.0
 
 **[HW-VERIFIED]** 以下を確認した。
 
-- follower arms: `192.168.1.5`, `192.168.1.4`
-- leader arms: `192.168.1.3`, `192.168.1.2`
+- follower arms x2: environment-specific IPを設定して到達性を確認
+- leader arms x2: environment-specific IPを設定して到達性を確認
 - Intel RealSense D405 x4
-- camera serialがconfigと一致
+- environment-specific camera serial mappingがconfigと一致
 - data rootへの書き込みと十分な空き容量
 
 ### Teleoperation
@@ -181,14 +181,7 @@ queue drops           0
 
 **[HW-VERIFIED]** FFmpeg `-copyts -timestamps default -c:v copy` で保存したMKV packet PTSが、同一hostの `time.monotonic()` と同じclock domainになることを確認した。
 
-5秒試行:
-
-```text
-first packet PTS      2686079.543 s
-frames                94
-```
-
-直後のhost `time.monotonic()` も2686xxx s台であり、経過時間を含め整合した。
+5秒試行では94 framesを保存し、MKV packet PTSとhost `time.monotonic()` が同一clock domainで連続していることを確認した。absolute monotonic値そのものは環境固有かつ再利用価値がないためreferenceには固定値として残さない。
 
 ### Final concurrent validation
 

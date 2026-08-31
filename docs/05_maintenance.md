@@ -42,20 +42,25 @@ LeRobotDataset v3.0
 
 ### Arm
 
-`config/teleop-lab.yaml` と `config/record-template.yaml` のIPを更新する。
+tracked templateはplaceholderのまま維持し、`config/teleop-local.yaml` と `config/record-local.yaml` のIPを対象環境で確認した値へ更新する。
 
 ### RealSense
 
-serial、resolution、fpsを更新する。camera交換時は `check_hardware.sh` を再実行する。
+serial、resolution、fpsを更新する。camera交換時は、接続deviceを再列挙してphysical viewとの対応を確認し、`check_hardware.sh` を再実行する。
 
-現referenceの4 serial:
+個体固有のserial numberはreference repositoryへ保存せず、各環境の `*-local.yaml` で設定する。
 
-```text
-cam_high         419122270075
-cam_low          412622272566
-cam_left_wrist   412622272309
-cam_right_wrist  412622272188
-```
+### Public repositoryへ含めない値
+
+以下はmachine-specific local config / local notesにのみ保持し、tracked fileへcommitしない。
+
+- Arm IP address
+- RealSense / GelSight / USB adapter等の個体serial
+- `/dev/*/by-id/...` の個体固有path
+- user名・hostnameを含むabsolute path
+- 個人・組織固有のdataset namespace
+
+一方、software version、verified commit、device model、resolution/fps、workstation specification、validationで得たrate/alignment統計は再現性のためreferenceへ残す。
 
 ## 4. Dataset schemaを変更する場合
 

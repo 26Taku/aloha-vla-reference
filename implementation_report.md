@@ -39,7 +39,7 @@ record.sh
 validate_dataset.sh
 ```
 
-設定は `config/` に集約し、研究室のArm IPとRealSense serialを明示した。
+設定は `config/` に集約した。Arm IPとRealSense serialは環境固有値のためtracked templateではplaceholderとし、初回利用時にhardware identificationを行ってGit管理外の `*-local.yaml` へ設定する方式とした。
 
 `record.sh` はDataset名、task、episode数、時間だけを受け取り、Hub uploadを無効にしたlocal recordingを生成する。
 
@@ -142,7 +142,7 @@ Phase 1のsoftware synchronizationは同一host monotonic clockを基準とし�
 最終提出commitを現地workstationへclean checkoutし、成果物に記載した手順だけで
 
 ```text
-setup -> hardware check -> teleoperation -> recording -> validation
+setup -> hardware identification/configuration -> hardware check -> teleoperation -> recording -> validation
 ```
 
 を通す。最終結果は `docs/06_validation_results.md` に追記する。

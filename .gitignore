@@ -24,3 +24,7 @@ logs/
 # Archives
 *.tar.gz
 *.zip
+
+# Machine-specific hardware configuration (created from tracked templates)
+config/teleop-local.yaml
+config/record-local.yaml

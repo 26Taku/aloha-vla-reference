@@ -19,7 +19,7 @@ def result(status: str, message: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Validate a LeRobot dataset against the lab ALOHA reference schema."
+        description="Validate a LeRobot dataset against the ALOHA reference schema."
     )
     parser.add_argument("dataset", type=Path)
     parser.add_argument("--config", required=True, type=Path)

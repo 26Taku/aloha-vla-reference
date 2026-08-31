@@ -1,7 +1,7 @@
 robot:
   type: bi_widowxai_follower_robot
-  left_arm_ip_address: 192.168.1.5
-  right_arm_ip_address: 192.168.1.4
+  left_arm_ip_address: "REPLACE_WITH_LEFT_FOLLOWER_IP"
+  right_arm_ip_address: "REPLACE_WITH_RIGHT_FOLLOWER_IP"
   id: bimanual_follower
 
   left_arm_max_relative_target: null
@@ -16,42 +16,42 @@ robot:
   cameras:
     cam_high:
       type: intelrealsense
-      serial_number_or_name: "419122270075"
+      serial_number_or_name: "REPLACE_WITH_CAM_HIGH_SERIAL"
       width: 424
       height: 240
       fps: 30
 
     cam_low:
       type: intelrealsense
-      serial_number_or_name: "412622272566"
+      serial_number_or_name: "REPLACE_WITH_CAM_LOW_SERIAL"
       width: 424
       height: 240
       fps: 30
 
     cam_left_wrist:
       type: intelrealsense
-      serial_number_or_name: "412622272309"
+      serial_number_or_name: "REPLACE_WITH_LEFT_WRIST_SERIAL"
       width: 424
       height: 240
       fps: 30
 
     cam_right_wrist:
       type: intelrealsense
-      serial_number_or_name: "412622272188"
+      serial_number_or_name: "REPLACE_WITH_RIGHT_WRIST_SERIAL"
       width: 424
       height: 240
       fps: 30
 
 teleop:
   type: bi_widowxai_leader_teleop
-  left_arm_ip_address: 192.168.1.3
-  right_arm_ip_address: 192.168.1.2
+  left_arm_ip_address: "REPLACE_WITH_LEFT_LEADER_IP"
+  right_arm_ip_address: "REPLACE_WITH_RIGHT_LEADER_IP"
   id: bimanual_leader
 
 dataset:
-  repo_id: phase1/aloha_clean_smoke_20260827
-  root: /mnt/nvme-data0/aloha_phase1_validation/20260827_clean_smoke
-  single_task: "Phase 1 clean environment recording smoke test."
+  repo_id: local/example_dataset
+  root: ./data/example_dataset
+  single_task: "Example task."
   fps: 30
   episode_time_s: 15
   reset_time_s: 5

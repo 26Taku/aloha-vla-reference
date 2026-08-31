@@ -12,10 +12,12 @@ Quick Startでは最短の実行手順のみを示す。本資料では、各コ
 
 ## 2. データ収集の流れ
 
-標準的な作業は以下の5段階で行う。
+標準的な作業は以下の6段階で行う。
 
 ```text
 Environment setup
+      ↓
+Hardware identification / configuration
       ↓
 Hardware check
       ↓
@@ -66,7 +68,44 @@ a4336933f34192a3daa7e9fb52674284bb5ae48e
 
 ---
 
-## 4. Hardware check
+## 4. Hardware identification / configuration
+
+### 目的
+
+本repositoryのconfigは特定個体のArm IP addressやRealSense serial numberを含まない。初回利用時は、実機を動かす前にhardware構成を確認してtemplateを編集する。
+
+最初にtracked templateからmachine-specific configを作る。
+
+```bash
+cp config/teleop-template.yaml config/teleop-local.yaml
+cp config/record-template.yaml config/record-local.yaml
+```
+
+編集対象は `config/teleop-local.yaml` と `config/record-local.yaml`。これらは `.gitignore` 対象であり、hardware固有値をrepositoryへcommitしない。
+
+両local configで設定する項目:
+
+```text
+robot.left_arm_ip_address
+robot.right_arm_ip_address
+teleop.left_arm_ip_address
+teleop.right_arm_ip_address
+robot.cameras.<camera_name>.serial_number_or_name
+```
+
+RealSenseはserialを列挙しただけではphysical viewとの対応が分からないため、viewerまたは1台ずつの確認で `cam_high`, `cam_low`, `cam_left_wrist`, `cam_right_wrist` を対応付ける。
+
+Arm IPはcontroller/network設定を確認する。repository内のplaceholderや他環境のIPをそのまま使用しない。
+
+### Checkpoint B
+
+- 4 ArmのIPとleft/right・leader/followerの対応を説明できる
+- 4 RealSense serialとphysical camera positionの対応を説明できる
+- 両local configから `REPLACE_WITH_` がなくなっている
+
+---
+
+## 5. Hardware check
 
 ### 実行
 
@@ -78,8 +117,10 @@ a4336933f34192a3daa7e9fb52674284bb5ae48e
 
 recordingを開始する前に、設定ファイルと実機の基本状態が一致しているかを確認する。
 
-checkerは `config/teleop-lab.yaml` を参照し、主に以下を確認する。
+checkerは `config/teleop-local.yaml` と `config/record-local.yaml` を参照し、主に以下を確認する。
 
+- placeholderが残っていないこと
+- 2つのconfigでArm IPとcamera serial mappingが一致すること
 - 使用するsoftware version
 - 4台のArmへのネットワーク到達性
 - 4台のRealSense D405の認識
@@ -87,7 +128,7 @@ checkerは `config/teleop-lab.yaml` を参照し、主に以下を確認する�
 - データ保存先への書き込み可否
 - 保存先の空き容量
 
-### Checkpoint B
+### Checkpoint C
 
 すべての確認が通ると `[READY]` が表示される。
 
@@ -97,7 +138,7 @@ checkerは `config/teleop-lab.yaml` を参照し、主に以下を確認する�
 
 ---
 
-## 5. Teleoperation
+## 6. Teleoperation
 
 ### 実行
 
@@ -109,7 +150,7 @@ checkerは `config/teleop-lab.yaml` を参照し、主に以下を確認する�
 
 recording前に、Leader-Follower制御とcamera acquisitionを実機で確認する。
 
-標準設定は `config/teleop-lab.yaml` に記載する。
+teleoperationのmachine-specific設定は `config/teleop-local.yaml` に記載する。
 
 実機確認時は以下の構成を使用した。
 
@@ -122,7 +163,7 @@ recording前に、Leader-Follower制御とcamera acquisitionを実機で確認�
 - left wrist camera
 - right wrist camera
 
-### Checkpoint C
+### Checkpoint D
 
 recordingへ進む前に、少なくとも以下を目視確認する。
 
@@ -140,7 +181,7 @@ Rerun / graphics backend由来のwarningが表示されてもteleoperation自体
 
 ---
 
-## 6. Recording
+## 7. Recording
 
 ### 実行
 
@@ -160,7 +201,7 @@ Rerun / graphics backend由来のwarningが表示されてもteleoperation自体
 
 ### `record.sh` が行うこと
 
-- `config/record-template.yaml` を基にruntime用設定を生成する
+- `config/record-local.yaml` を基にruntime用設定を生成する
 - dataset名を設定する
 - task descriptionを設定する
 - episode数とepisode時間を設定する
@@ -183,7 +224,7 @@ runtime用設定は `.runtime/` 以下に生成し、Git管理対象には含め
 
 14次元は左右Armそれぞれ7値の合計で構成される。
 
-### Checkpoint D
+### Checkpoint E
 
 収録終了後、以下を確認する。
 
@@ -199,7 +240,7 @@ target fps × episode時間と保存frame数は、実行境界や処理負荷等
 
 ---
 
-## 7. LeRobotDatasetの内容
+## 8. LeRobotDatasetの内容
 
 baseline recordingでは、少なくとも以下の情報が保存される。
 
@@ -228,7 +269,7 @@ camera画像はdataset内ではvideoとして保存される。Parquetにはrobo
 
 ---
 
-## 8. Dataset validation
+## 9. Dataset validation
 
 ### 実行
 
@@ -269,7 +310,7 @@ validatorでは主に以下を確認する。
 
 すべて通ればPASSとなる。
 
-### Checkpoint E
+### Checkpoint F
 
 baseline datasetについて、
 
@@ -283,7 +324,7 @@ validatorはdatasetの構造的な健全性を確認するものであり、demo
 
 ---
 
-## 9. 状態量を追加した場合
+## 10. 状態量を追加した場合
 
 実機検証では、Trossen側で取得可能なexternal effortを有効化し、observation stateを14次元から28次元へ拡張したrecordingも確認した。
 
@@ -309,7 +350,7 @@ observation.state  28D
 
 ---
 
-## 10. Dataset収録時に残す情報
+## 11. Dataset収録時に残す情報
 
 再現性のため、実験datasetを作成するときは少なくとも以下を記録する。
 
@@ -327,16 +368,17 @@ hardware構成やsoftware versionを変更した場合は、変更内容も記�
 
 ---
 
-## 11. 標準フローの完了条件
+## 12. 標準フローの完了条件
 
 VLA・模倣学習向けのbaseline data collectionでは、以下をすべて満たした時点を収録環境の動作確認完了とする。
 
 ```text
 [ ] setupが完了
+[ ] hardware identifierを調査しconfigへ設定
 [ ] hardware checkerがREADY
 [ ] teleoperationを目視確認
 [ ] episode recordingが完了
 [ ] dataset validatorがPASS
 ```
 
-この5段階を通すことで、「packageが入った」「Armがpingに応答した」といった部分確認だけではなく、実際に学習用Datasetが生成されるところまでを一つのacceptance pathとして確認する。
+この6段階を通すことで、「packageが入った」「Armがpingに応答した」といった部分確認だけではなく、実際に学習用Datasetが生成されるところまでを一つのacceptance pathとして確認する。

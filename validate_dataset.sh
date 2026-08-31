@@ -3,6 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TROSSEN_DIR="$ROOT_DIR/lerobot_trossen"
+CONFIG="$ROOT_DIR/config/record-local.yaml"
+
+if [[ ! -f "$CONFIG" ]]; then
+    echo "[FAIL] Local recording config not found:"
+    echo "       $CONFIG"
+    echo "Create it from config/record-template.yaml and set this machine's hardware identifiers."
+    exit 1
+fi
 
 if [[ $# -lt 1 ]]; then
     echo "Usage:"
@@ -28,5 +36,5 @@ cd "$TROSSEN_DIR"
 
 exec uv run python "$ROOT_DIR/scripts/validate_dataset.py" \
     "$DATASET_PATH" \
-    --config "$ROOT_DIR/config/teleop-lab.yaml" \
+    --config "$ROOT_DIR/config/record-local.yaml" \
     "$@"

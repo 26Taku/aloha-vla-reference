@@ -3,8 +3,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TROSSEN_DIR="$ROOT_DIR/lerobot_trossen"
-TEMPLATE="$ROOT_DIR/config/record-template.yaml"
+CONFIG="$ROOT_DIR/config/record-local.yaml"
 RUNTIME_DIR="$ROOT_DIR/.runtime"
+
+if [[ ! -f "$CONFIG" ]]; then
+    echo "[FAIL] Local recording config not found:"
+    echo "       $CONFIG"
+    echo "Create it from config/record-template.yaml and set this machine's hardware identifiers."
+    exit 1
+fi
 
 usage() {
     echo 'Usage:'
@@ -53,7 +60,7 @@ RUNTIME_CONFIG="$RUNTIME_DIR/record-${DATASET_NAME}.yaml"
 cd "$TROSSEN_DIR"
 
 uv run python - \
-    "$TEMPLATE" \
+    "$CONFIG" \
     "$RUNTIME_CONFIG" \
     "$DATASET_NAME" \
     "$TASK" \
@@ -69,13 +76,13 @@ output = Path(sys.argv[2])
 
 cfg = yaml.safe_load(template.read_text())
 
-cfg["dataset"]["repo_id"] = f"lab/{sys.argv[3]}"
+cfg["dataset"]["repo_id"] = f"local/{sys.argv[3]}"
 cfg["dataset"]["single_task"] = sys.argv[4]
 cfg["dataset"]["root"] = sys.argv[5]
 cfg["dataset"]["num_episodes"] = int(sys.argv[6])
 cfg["dataset"]["episode_time_s"] = int(sys.argv[7])
 
-# Lab defaults: keep data local unless deliberately changed.
+# Reference defaults: keep data local unless deliberately changed.
 cfg["dataset"]["push_to_hub"] = False
 cfg["dataset"]["private"] = True
 cfg["dataset"]["video"] = True

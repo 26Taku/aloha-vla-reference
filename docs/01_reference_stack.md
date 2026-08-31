@@ -41,11 +41,28 @@ ALOHAにはTrossenの各種driverやROS 2など複数の利用方法があるが
   - left wrist
   - right wrist
 
-研究室固有のIP addressおよびcamera serialは `config/teleop-lab.yaml` と `config/record-template.yaml` に記載する。
+Arm IP addressとcamera serial numberは環境固有値であるため、本repositoryには実機値を保存しない。tracked templateから `config/teleop-local.yaml` / `config/record-local.yaml` を作成し、接続hardwareを調査した上で `REPLACE_WITH_...` placeholderを置き換える。local configは `.gitignore` 対象とする。
 
 ---
 
-## 3. この構成をbaselineとする理由
+## 3. 初回利用時のhardware identification
+
+本referenceでは、特定個体のhardware identifierをdefault configへ埋め込まない。環境構築後、teleoperationより前に以下を確認する。
+
+1. left/right follower ArmのIP address
+2. left/right leader ArmのIP address
+3. 4台のRealSense serial number
+4. 各RealSenseと `cam_high` / `cam_low` / `cam_left_wrist` / `cam_right_wrist` の物理対応
+
+RealSense serialは `pyrealsense2` またはLibrealsense toolsで列挙できる。Arm IPはcontroller/network設定を確認し、既存環境のIPを推測で流用しない。
+
+`robot.id` / `teleop.id` はLeRobot上のlogical identifierであり、hardware serialではないため、通常はtemplateの値を維持する。
+
+設定後は `check_hardware.sh` でlocal configのplaceholder残存、teleoperation/recording config間のhardware identity、実機への到達性を確認する。
+
+---
+
+## 4. この構成をbaselineとする理由
 
 本プロジェクトの目的は、ALOHAそのものを制御することではなく、**VLA・模倣学習に利用できるデータを収集すること**である。
 
@@ -64,7 +81,7 @@ LeRobotではrobotを共通interfaceとして扱い、observationの取得とact
 
 ---
 
-## 4. 他の構成との使い分け
+## 5. 他の構成との使い分け
 
 ### Trossen公式 LeRobot Plugin
 
@@ -110,7 +127,7 @@ LeRobotではrobotを共通interfaceとして扱い、observationの取得とact
 
 ---
 
-## 5. 実機で確認済みの範囲
+## 6. 実機で確認済みの範囲
 
 以下は研究室のALOHAで実際に確認済み。
 
@@ -131,7 +148,7 @@ LeRobotではrobotを共通interfaceとして扱い、observationの取得とact
 
 ---
 
-## 6. 標準構成から変更する場合
+## 7. 標準構成から変更する場合
 
 以下を変更する場合は、Quick Startをそのまま使用せず、関連箇所を確認する。
 
@@ -146,7 +163,7 @@ LeRobotではrobotを共通interfaceとして扱い、observationの取得とact
 
 ---
 
-## 7. 公式資料
+## 8. 公式資料
 
 - Trossen Robotics LeRobot integration  
   https://github.com/TrossenRobotics/lerobot_trossen

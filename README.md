@@ -50,6 +50,46 @@ ALOHA実機で、以下を確認しています。
 
 ## 3. Quick Start
 
+初回利用時は、以下を上から順に実行します。hardware固有値を調べる前にteleoperationやrecordingへ進まないでください。
+
+```text
+Repository取得
+    ↓
+Environment setup
+    ↓
+Hardware identification
+    ↓
+Local config作成・編集
+    ↓
+Hardware check
+    ↓
+Teleoperation
+    ↓
+Recording
+    ↓
+Dataset validation
+```
+
+### 3.0 Repository取得と前提条件
+
+検証済み環境はUbuntu 24.04です。少なくとも `git` と `uv` が必要です。`uv` が未導入の場合は、公式手順を参照してください。
+
+- uv installation: https://docs.astral.sh/uv/getting-started/installation/
+
+GitHubから利用する場合:
+
+```bash
+git clone https://github.com/26Taku/aloha-vla-reference.git
+cd aloha-vla-reference
+```
+
+ZIP等で受け取った場合は展開し、`setup.sh` と `README.md` が存在するrepository rootへ移動してください。
+
+```bash
+pwd
+ls README.md setup.sh
+```
+
 ### 3.1 Environment setup
 
 ```bash
@@ -57,6 +97,8 @@ ALOHA実機で、以下を確認しています。
 ```
 
 Trossen公式リポジトリを検証済みcommitで取得し、必要なPython環境を構築します。
+
+`setup.sh` 完了後、**すぐに `check_hardware.sh` を実行するのではなく、次節でlocal configを作成・編集してください。**
 
 ### 3.2 Hardware identification and configuration
 
@@ -113,6 +155,29 @@ robot.cameras.<camera_name>.serial_number_or_name
 ```
 
 `robot.id: bimanual_follower` と `teleop.id: bimanual_leader` はLeRobot上のlogical identifierであり、Armのhardware serialやIP addressではありません。通常は変更不要です。
+
+local configは任意のeditorで編集できます。例:
+
+```bash
+nano config/teleop-local.yaml
+nano config/record-local.yaml
+```
+
+編集後、placeholderが残っていないことを確認します。**次のコマンドが無出力になること**が完了条件です。
+
+```bash
+grep -RIn 'REPLACE_WITH_' \
+  config/teleop-local.yaml \
+  config/record-local.yaml
+```
+
+`*-local.yaml` はGit管理対象外です。次のコマンドでignoreされていることも確認できます。
+
+```bash
+git check-ignore -v \
+  config/teleop-local.yaml \
+  config/record-local.yaml
+```
 
 ### 3.3 Hardware check
 

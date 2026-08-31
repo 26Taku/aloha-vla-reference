@@ -1,10 +1,14 @@
 # Validation Results
 
-本資料では、Phase 1で実際に研究室環境・ALOHA実機を用いて確認した範囲を記録する。検証結果と設計上の提案を混同しないため、実機確認済みの内容だけを主に記載する。
+## 1. この資料の役割
 
-## 1. Reference environment
+本資料は、**Phase 1で実際に実機・workstation上で確認した結果の証跡**を記録する。
 
-検証機:
+操作手順は [02 Data Collection](02_data_collection.md)、設計理由は [01 Reference Stack](01_reference_stack.md) / [03 Architecture and Extension](03_architecture_and_extension.md) に分離する。
+
+## 2. Reference environment
+
+検証workstation:
 
 ```text
 OS: Ubuntu 24.04.4 LTS
@@ -13,9 +17,9 @@ RAM: 約503 GiB
 GPU: NVIDIA RTX PRO 6000 96GB x4
 ```
 
-GPU 0は他用途で使用中だったため、Phase 1のdata collection validationではheavy GPU workloadを避けた。
+GPU 0は他用途で使用中だったため、Phase 1 data collection validationではheavy GPU workloadを避けた。
 
-Software reference:
+Software:
 
 ```text
 TrossenRobotics/lerobot_trossen
@@ -25,29 +29,39 @@ Python 3.12
 Trossen Arm 1.10.0
 ```
 
-## 2. Baseline ALOHA validation — 2026-08-27
+Machine-specific Arm IP、camera serial、USB serial等は公開referenceへ記録しない。
+
+## 3. Baseline ALOHA validation — 2026-08-27
 
 ### Clean environment setup
 
-**[HW-VERIFIED]** 既存研究forkとは別directoryへTrossen公式repositoryをcloneし、固定commitで `uv sync --frozen` が完了した。
+**[HW-VERIFIED]**
+
+既存研究forkとは別directoryへTrossen公式repositoryをcloneし、固定commitで `uv sync --frozen` が完了した。
 
 ### Hardware preflight
 
-**[HW-VERIFIED]** 以下を確認した。
+**[HW-VERIFIED]**
 
-- follower arms x2: environment-specific IPを設定して到達性を確認
-- leader arms x2: environment-specific IPを設定して到達性を確認
+- follower arms x2
+- leader arms x2
 - Intel RealSense D405 x4
-- environment-specific camera serial mappingがconfigと一致
-- data rootへの書き込みと十分な空き容量
+- configured camera physical mapping
+- data root write access / free space
+
+environment-specific identifierを設定した上でpreflightを通した。
 
 ### Teleoperation
 
-**[HW-VERIFIED]** Bimanual leader-follower teleoperation、左右gripper、4 camera viewを確認した。loopは概ね30 Hzで動作した。
+**[HW-VERIFIED]**
+
+Bimanual leader-follower teleoperation、左右gripper、4 camera viewを確認した。loopは概ね30 Hzで動作した。
 
 ### Baseline recording
 
-**[HW-VERIFIED]** 15秒・1 episode recordingが完了した。
+**[HW-VERIFIED]**
+
+15秒・1 episode:
 
 ```text
 Dataset format        LeRobotDataset v3.0
@@ -56,47 +70,50 @@ action                14D
 observation.state     14D
 camera streams        4
 camera video          424x240 / 30 fps
+validator             PASS
 ```
-
-Dataset validatorでmetadata、Parquet、episode metadata、4 video streamの先頭frame decodeまでPASSした。
 
 ### Trossen external effort
 
-**[HW-VERIFIED]** `include_external_effort=true` でrecordingし、左右7値ずつのexternal effortが追加されることを確認した。
+**[HW-VERIFIED]**
+
+`include_external_effort=true`:
 
 ```text
 action                14D
 observation.state     28D
 ```
 
-これはTrossen driver内部のstate extension確認であり、独立外部F/T sensorの検証とは区別する。
+Trossen driver内部state extensionの確認であり、独立外部F/T sensorとは区別する。
 
 ### Wrapper recording
 
-**[HW-VERIFIED]** `record.sh` を使用した1 episode smoke testで299 framesを保存し、validator PASSを確認した。
+**[HW-VERIFIED]**
 
-## 3. High-rate numeric sensor validation — 2026-08-31
-
-検証sensorとして研究室既存のMMS101 ROS 2 streamを使用した。物理的な左右取付状態やforce値の妥当性を評価する試験ではなく、**異周期numeric streamの取得・timestamp・alignment architecture**を確認する試験である。
-
-### Sensor rate
-
-**[HW-VERIFIED]** 使用したUMI sensor workspaceのraw topics:
+`record.sh` による1 episode smoke test:
 
 ```text
-/force_torque/left
-/force_torque/right
+frames                299
+validator             PASS
 ```
 
-実測rateは左右とも約100 Hzだった。
+## 4. High-rate numeric sensor validation — 2026-08-31
 
-別環境のMMS101 driverでは異なるsampling intervalを持つ場合があるため、この100 Hzをsensor一般仕様として扱わない。
+研究室既存のMMS101 ROS 2 streamを、異周期numeric sensor architectureのtest caseとして使用した。force値のground truthや物理取付の妥当性を評価する試験ではない。
+
+### Native rate
+
+**[HW-VERIFIED]**
+
+使用したdriverではraw topicsが約100 Hzで動作した。
+
+この値は使用driver/configurationの結果であり、MMS101一般の固定仕様として扱わない。
 
 ### Concurrent acquisition
 
-**[HW-VERIFIED]** ALOHA recordingとMMS101 sidecarを同時実行した。
+**[HW-VERIFIED]**
 
-ALOHA dataset:
+ALOHA:
 
 ```text
 frames                299
@@ -107,11 +124,16 @@ camera streams        4
 validator             PASS
 ```
 
-MMS101 sidecarの60秒試行では左右約6005 samplesを取得した。
+Sensor sidecar:
 
-### Generic causal alignment
+```text
+約60 s
+左右約6005 samples
+```
 
-**[HW-VERIFIED]** generic loggerとrobot timestamp sidecarを使用した検証結果:
+### Causal latest-sample alignment
+
+**[HW-VERIFIED]**
 
 ```text
 robot frames          299
@@ -126,7 +148,7 @@ sensor age max        16.396 ms
 
 ### 200 ms history window
 
-**[HW-VERIFIED]** `(t-200 ms, t]` のcausal history manifestを作成した。
+**[HW-VERIFIED]**
 
 ```text
 robot frames          299
@@ -140,27 +162,22 @@ min                   19
 max                   21
 ```
 
-## 4. Asynchronous camera validation — 2026-08-31
+## 5. Asynchronous camera validation — 2026-08-31
 
-検証camera: GelSight Mini R0B 1台。
+GelSight Mini R0B 1台を、robot FPSと異なるcamera architectureのtest caseとして使用した。触覚task性能の評価ではない。
 
-この試験も触覚値・接触taskの妥当性ではなく、**robot FPSと異なるcamera streamの取得・timestamp・causal alignment**を確認するものとした。
-
-### Device / format
-
-V4L2で確認したmode:
+### V4L2 mode / actual rate
 
 ```text
-MJPEG
-3280x2464
-advertised 25 fps
+format                MJPEG
+resolution            3280x2464
+advertised             25 fps
+actual stream          約18.7-18.8 Hz
 ```
-
-`v4l2-ctl` / OpenCV grab / FFmpeg stream copyでは実効約18.7--18.8 Hzだった。advertised 25 fpsには到達しなかった。
 
 ### Capture implementation comparison
 
-Phase 1で作成したfull-resolution JPEG-per-frame prototype:
+Phase 1 full-resolution JPEG-per-frame comparison prototype:
 
 ```text
 captured              87 frames / 10 s
@@ -168,24 +185,33 @@ capture rate          8.598 Hz
 queue drops           0
 ```
 
-同じcameraをV4L2 MJPEGのstream copyで保存:
+V4L2 MJPEG stream copy:
 
 ```text
 188 frames / 約10 s
 ≈18.8 Hz
 ```
 
-この比較は**Phase 1 prototypeの方式選定用**であり、研究室既存GelSight codeまたはGelSight公式softwareのbenchmarkではない。
+これはPhase 1で作成したprototypeの方式比較であり、研究室既存codeまたはGelSight公式softwareのbenchmarkではない。
 
 ### Timestamp preservation
 
-**[HW-VERIFIED]** FFmpeg `-copyts -timestamps default -c:v copy` で保存したMKV packet PTSが、同一hostの `time.monotonic()` と同じclock domainになることを確認した。
+**[HW-VERIFIED]**
 
-5秒試行では94 framesを保存し、MKV packet PTSとhost `time.monotonic()` が同一clock domainで連続していることを確認した。absolute monotonic値そのものは環境固有かつ再利用価値がないためreferenceには固定値として残さない。
+FFmpeg `-copyts -timestamps default -c:v copy` で保存したMKV packet PTSと、同一hostの `time.monotonic()` が同じclock domainになることを確認した。
+
+5秒試行:
+
+```text
+frames                94
+effective rate        約18.8 Hz
+```
+
+absolute monotonic値そのものは再利用価値がないため公開referenceには固定しない。
 
 ### Final concurrent validation
 
-**[HW-VERIFIED]** GelSight streamを先に開始し、ALOHA 10秒recordingを並行実行した。
+**[HW-VERIFIED]**
 
 ALOHA:
 
@@ -217,31 +243,39 @@ camera age p95        50.602 ms
 camera age max        53.836 ms
 ```
 
-18.753 Hzのframe periodは約53 msであり、30 Hz robot frameに対するlatest causal frameのage分布として整合する。
+## 6. Verification limits
 
-## 5. Verification limits
+Phase 1では以下を保証しない。
 
-以下はPhase 1で確認していない、または保証しない。
-
-- GelSight 2台同時使用時のUSB/CPU/storage capacity
-- GelSightをALOHA gripperへ取り付けた状態での触覚task性能
-- MMS101のforce値そのもののground truth validation
-- hardware-trigger levelのcamera/sensor synchronization
+- GelSight 2台同時使用時のUSB / CPU / storage capacity
+- GelSightをgripperへ取り付けた状態での触覚task性能
+- MMS101 force値のground truth
+- hardware-trigger level synchronization
 - 複数PC間clock synchronization
-- VLA modelのtraining/inference performance
+- VLA training / inference performance
 
-GelSight 1台でも、asynchronous camera architecture、packet timestamp保持、concurrent recording、causal alignmentの成立は検証できている。2台試験はarchitecture成立条件ではなくcapacity testとして扱う。
+GelSight 1台で、asynchronous camera architecture、packet timestamp保持、concurrent recording、causal alignmentの成立まで確認した。2台同時試験はarchitecture成立条件ではなくcapacity testとして扱う。
 
-## 6. Final delivery acceptance
+## 7. Final delivery acceptance
 
-提出物そのものをclean checkoutし、次を上から実行して最終確認する。
+最終提出commitに対するacceptance結果をここへ記録する。
+
+現在:
 
 ```text
-[ ] setup.sh
-[ ] check_hardware.sh -> READY
-[ ] teleoperate.sh -> bimanual + gripper + 4 cameras
-[ ] record.sh -> 1 episode completes
-[ ] validate_dataset.sh -> PASS
+Status: PENDING FINAL CLEAN-CHECKOUT ACCEPTANCE
 ```
 
-この欄は最終acceptance run後にcommit hashと結果を追記する。
+完了後に以下のみ追記する。
+
+```text
+repository commit:
+setup:
+hardware identification / local config:
+hardware check:
+teleoperation:
+recording:
+dataset validation:
+```
+
+実行手順そのものは [02 Data Collection](02_data_collection.md) を正とする。

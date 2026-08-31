@@ -1,89 +1,167 @@
 # Data Collection
 
-## 1. 目的
+## 1. この資料の役割
 
-本資料では、研究室のALOHAを用いてVLA・模倣学習向けデータを収集する際の流れと、各段階で確認する内容を整理する。
+本資料は、**初回利用からDataset validation完了までの唯一の詳細操作マニュアル**である。
 
-Quick Startでは最短の実行手順のみを示す。本資料では、各コマンドが何を確認しているか、どのようなデータが保存されるか、収録後に何を検証するかを補足する。
+初めて利用する場合は、このページを上から順に実行する。途中で問題が発生した場合は後段へ進まず、[04 Troubleshooting](04_troubleshooting.md) を参照してそのcheckpointで解決する。
 
-対象とする標準構成は `docs/01_reference_stack.md` に記載したTrossen Robotics公式 `lerobot_trossen` ベースの構成である。
-
----
-
-## 2. データ収集の流れ
-
-標準的な作業は以下の6段階で行う。
+完了条件:
 
 ```text
 Environment setup
-      ↓
-Hardware identification / configuration
-      ↓
-Hardware check
-      ↓
-Teleoperation
-      ↓
-Recording
-      ↓
-Dataset validation
+    ↓
+Hardware identification / local configuration
+    ↓
+Hardware check -> READY
+    ↓
+Teleoperation -> visual check
+    ↓
+Recording -> one episode or more
+    ↓
+Dataset validation -> PASS
 ```
 
-それぞれの段階を独立したcheckpointとして扱う。途中で問題が出た場合は、後段へ進まず、その段階で原因を切り分ける。
+## 2. 前提とrepository取得
 
----
+検証済みOSはUbuntu 24.04である。少なくとも `git` と `uv` が必要。
+
+```bash
+git --version
+uv --version
+```
+
+`uv` がない場合は公式手順で導入する。
+
+- https://docs.astral.sh/uv/getting-started/installation/
+
+GitHubから取得する場合:
+
+```bash
+git clone https://github.com/26Taku/aloha-vla-reference.git
+cd aloha-vla-reference
+```
+
+ZIP等で受け取った場合は展開し、`README.md` と `setup.sh` があるrepository rootへ移動する。
+
+```bash
+pwd
+ls README.md setup.sh
+```
 
 ## 3. Environment setup
 
-### 実行
+実行:
 
 ```bash
 ./setup.sh
 ```
 
-### 目的
+このscriptは以下を行う。
 
-- Trossen公式 `lerobot_trossen` を取得する
-- 検証済みcommitへ固定する
-- `uv sync --frozen` により依存関係を構築する
-- 使用する主要package versionを確認する
+- Trossen公式 `lerobot_trossen` を取得
+- 検証済みcommitへ固定
+- `uv sync --frozen` でPython environmentを構築
+- Python / LeRobot / Trossen Arm versionを表示
+- `data/` と `logs/` を作成
 
-本成果物では、検証済みcommitとして以下を使用する。
+Reference revision:
 
 ```text
 a4336933f34192a3daa7e9fb52674284bb5ae48e
 ```
 
-研究室PCでは、Ubuntu 24.04環境上でPython 3.12.3を使用し、LeRobot 0.6.0、Trossen Arm 1.10.0を含む環境構築を確認した。
+Checkpoint A:
 
-### Checkpoint A
+- `setup.sh` がerrorなく終了する
+- Trossen revisionがreference commitと一致する
+- Python 3.12系、LeRobot 0.6.0、Trossen Arm 1.10.0が確認できる
 
-以下を確認する。
+**Setup後はまだteleoperationへ進まない。次にhardware固有値を調査してlocal configを作る。**
 
-- setup scriptがエラーなく終了する
-- repositoryのcommitが検証済みcommitと一致する
-- Pythonが3.12系である
-- LeRobotおよびTrossen Arm packageのversionが検証済み構成と一致する
+## 4. Hardware identification / local configuration
 
-`setup.sh` は既存の研究用repositoryを変更せず、成果物用の別ディレクトリで使用することを前提とする。
+### 4.1 local configを作成
 
----
-
-## 4. Hardware identification / configuration
-
-### 目的
-
-本repositoryのconfigは特定個体のArm IP addressやRealSense serial numberを含まない。初回利用時は、実機を動かす前にhardware構成を確認してtemplateを編集する。
-
-最初にtracked templateからmachine-specific configを作る。
+tracked templateをコピーする。
 
 ```bash
 cp config/teleop-template.yaml config/teleop-local.yaml
 cp config/record-template.yaml config/record-local.yaml
 ```
 
-編集対象は `config/teleop-local.yaml` と `config/record-local.yaml`。これらは `.gitignore` 対象であり、hardware固有値をrepositoryへcommitしない。
+`*-local.yaml` は `.gitignore` 対象である。Arm IPやcamera serial等のmachine-specific identifierはこの2ファイルにのみ設定する。
 
-両local configで設定する項目:
+### 4.2 Arm IPを確認
+
+確認対象:
+
+```text
+left follower
+right follower
+left leader
+right leader
+```
+
+PC側networkの確認例:
+
+```bash
+ip -br addr
+ip neigh
+```
+
+ただし `ip neigh` の結果だけでleft/rightやleader/followerを断定しない。Arm controller/network設定と実機の物理配置を照合して4つのIPを確定する。
+
+他環境で使われていたIPを推測で流用しない。
+
+### 4.3 RealSense serialとphysical roleを確認
+
+setup後のPython environmentから接続deviceを列挙できる。
+
+```bash
+cd lerobot_trossen
+
+uv run python - <<'PY'
+import pyrealsense2 as rs
+
+for dev in rs.context().query_devices():
+    print(
+        dev.get_info(rs.camera_info.name),
+        dev.get_info(rs.camera_info.serial_number),
+    )
+PY
+
+cd ..
+```
+
+必要に応じて `rs-enumerate-devices` やRealSense Viewerも利用する。
+
+serial一覧だけではphysical roleは分からない。映像を確認する、または1台ずつ接続状態を確認して、次の対応を決める。
+
+```text
+cam_high
+cam_low
+cam_left_wrist
+cam_right_wrist
+```
+
+### 4.4 local configを編集
+
+編集対象:
+
+```text
+config/teleop-local.yaml
+config/record-local.yaml
+```
+
+任意のeditorを使用する。例:
+
+```bash
+nano config/teleop-local.yaml
+nano config/record-local.yaml
+```
+
+両configで設定するhardware identity:
 
 ```text
 robot.left_arm_ip_address
@@ -93,104 +171,107 @@ teleop.right_arm_ip_address
 robot.cameras.<camera_name>.serial_number_or_name
 ```
 
-RealSenseはserialを列挙しただけではphysical viewとの対応が分からないため、viewerまたは1台ずつの確認で `cam_high`, `cam_low`, `cam_left_wrist`, `cam_right_wrist` を対応付ける。
+`robot.id: bimanual_follower` と `teleop.id: bimanual_leader` はLeRobot上のlogical identifierであり、hardware serialではない。通常は変更しない。
 
-Arm IPはcontroller/network設定を確認する。repository内のplaceholderや他環境のIPをそのまま使用しない。
+`teleop-local.yaml` のcamera FPSは15、`record-local.yaml` は30としている。hardware identityは同じだが、用途に応じて取得設定が異なるため、この差は意図したものである。
 
-### Checkpoint B
+### 4.5 placeholderとGit管理状態を確認
 
-- 4 ArmのIPとleft/right・leader/followerの対応を説明できる
-- 4 RealSense serialとphysical camera positionの対応を説明できる
-- 両local configから `REPLACE_WITH_` がなくなっている
+次が無出力になることを確認する。
 
----
+```bash
+grep -RIn 'REPLACE_WITH_' \
+  config/teleop-local.yaml \
+  config/record-local.yaml
+```
+
+local configがGit管理外であることも確認できる。
+
+```bash
+git check-ignore -v \
+  config/teleop-local.yaml \
+  config/record-local.yaml
+```
+
+Checkpoint B:
+
+- 4 ArmのIPと役割を確認した
+- 4 RealSense serialとphysical roleを確認した
+- 両local configを編集した
+- `REPLACE_WITH_` が残っていない
+- machine-specific identifierをtracked templateへ書いていない
 
 ## 5. Hardware check
 
-### 実行
+ALOHAとcameraの電源・接続を確認してから実行する。
 
 ```bash
 ./check_hardware.sh
 ```
 
-### 目的
+checkerは主に以下を確認する。
 
-recordingを開始する前に、設定ファイルと実機の基本状態が一致しているかを確認する。
+- local configの存在
+- placeholder残存
+- teleoperation / recording config間のArm IPとcamera serial mapping
+- software version
+- Armへのnetwork reachability
+- RealSense認識とserial mapping
+- data directoryへの書き込み
+- storage free space
 
-checkerは `config/teleop-local.yaml` と `config/record-local.yaml` を参照し、主に以下を確認する。
+すべて通ると `[READY]` を表示する。
 
-- placeholderが残っていないこと
-- 2つのconfigでArm IPとcamera serial mappingが一致すること
-- 使用するsoftware version
-- 4台のArmへのネットワーク到達性
-- 4台のRealSense D405の認識
-- camera serialが設定値と一致しているか
-- データ保存先への書き込み可否
-- 保存先の空き容量
+Checkpoint C:
 
-### Checkpoint C
+```text
+[READY]
+```
 
-すべての確認が通ると `[READY]` が表示される。
+が出ること。
 
-注意点として、Armへのpingが成功することはネットワーク到達性を示すだけであり、Robot driverを用いた実動作まで保証するものではない。実際のArm制御は次のteleoperationで確認する。
-
-4台すべてのArmへのpingが失敗する場合は、まずALOHA本体の電源状態を確認する。実機検証では、Arm電源OFF時に全IPへのpingが失敗し、電源投入後に復旧することを確認した。
-
----
+注意: Armへのpingはnetwork reachabilityの確認であり、driverを含めた実動作保証ではない。次のteleoperationで実機動作を確認する。
 
 ## 6. Teleoperation
 
-### 実行
+実行:
 
 ```bash
 ./teleoperate.sh
 ```
 
-### 目的
+確認項目:
 
-recording前に、Leader-Follower制御とcamera acquisitionを実機で確認する。
-
-teleoperationのmachine-specific設定は `config/teleop-local.yaml` に記載する。
-
-実機確認時は以下の構成を使用した。
-
-- left follower
-- right follower
-- left leader
-- right leader
-- high camera
-- low camera
-- left wrist camera
-- right wrist camera
-
-### Checkpoint D
-
-recordingへ進む前に、少なくとも以下を目視確認する。
-
-- 左Leaderの操作が左Followerへ対応している
-- 右Leaderの操作が右Followerへ対応している
-- 左右Gripperが意図した側で動作する
-- 4つのcamera viewが取得できている
+- left leader -> left follower
+- right leader -> right follower
+- 左右gripper
+- `cam_high`
+- `cam_low`
+- `cam_left_wrist`
+- `cam_right_wrist`
 - 不自然な振動や連続的な異常動作がない
 
-終了時は `Ctrl+C` を使用し、Armおよびcameraが正常にdisconnectされることを確認する。
+終了:
 
-実機検証では、標準構成でteleoperation loopが約30 Hzで動作することを確認した。ただし、実際の周期はPC負荷やcamera処理等の影響を受けるため、常に厳密な30 Hzになることを保証するものではない。
+```text
+Ctrl+C
+```
 
-Rerun / graphics backend由来のwarningが表示されてもteleoperation自体が正常に動作する場合がある。既知のwarningは `docs/04_troubleshooting.md` に整理する。
+Checkpoint D:
 
----
+- 左右対応が正しい
+- gripperが意図した側で動く
+- 4 camera viewのphysical mappingが正しい
+- 正常にdisconnectできる
+
+Rerun / Vulkan / EGL等のwarningが出た場合は、warning文字列だけで失敗と判断せず [04 Troubleshooting](04_troubleshooting.md) を参照する。
 
 ## 7. Recording
-
-### 実行
-
-`record.sh` は、実機確認済みのrecording設定をtemplateとして使用し、dataset名、task、episode数、episode時間を指定して収録するwrapperである。
 
 形式:
 
 ```bash
-./record.sh DATASET_NAME "TASK" NUM_EPISODES EPISODE_TIME_S
+./record.sh DATASET_NAME "TASK" [NUM_EPISODES] [EPISODE_TIME_S]
 ```
 
 例:
@@ -199,79 +280,30 @@ Rerun / graphics backend由来のwarningが表示されてもteleoperation自体
 ./record.sh test_dataset "Pick and place an object" 1 10
 ```
 
-### `record.sh` が行うこと
+`record.sh` は `config/record-local.yaml` を基にruntime configを作り、dataset固有値を設定して `lerobot-record` を実行する。
 
-- `config/record-local.yaml` を基にruntime用設定を生成する
-- dataset名を設定する
-- task descriptionを設定する
-- episode数とepisode時間を設定する
-- ローカル保存先を設定する
-- Hugging Face Hubへの自動uploadを無効にする
-- Trossen公式 `lerobot-record` を実行する
+主なdefault:
 
-runtime用設定は `.runtime/` 以下に生成し、Git管理対象には含めない。
+- LeRobotDataset v3
+- target FPS: 30
+- RGB cameras: 4
+- resolution: 424 x 240
+- Hub upload: disabled
+- output: `data/DATASET_NAME`
 
-### 標準recording構成
+同名datasetが既に存在する場合は上書きせず停止する。
 
-実機確認したbaselineでは以下を使用した。
+Checkpoint E:
 
-- recording target: LeRobotDataset v3.0
-- target fps: 30
-- camera: 4 streams
-- RGB resolution: 424 × 240
-- action: 14 dimensions
-- observation state: 14 dimensions
+- recording processが正常終了した
+- `data/DATASET_NAME/` が作成された
+- metadata / Parquet / videoが生成された
 
-14次元は左右Armそれぞれ7値の合計で構成される。
+`duration x fps` とframe数は実行境界により1 frame程度ずれる場合がある。固定frame数だけで成否を判断しない。
 
-### Checkpoint E
+## 8. Dataset validation
 
-収録終了後、以下を確認する。
-
-- dataset directoryが作成されている
-- metadataが生成されている
-- episode dataが保存されている
-- camera videoが保存されている
-- recording processが異常終了していない
-
-実機で行った15秒・1 episodeのbaseline収録では449 framesが保存された。
-
-target fps × episode時間と保存frame数は、実行境界や処理負荷等により完全一致しない場合がある。そのため、単純な `duration × fps` の完全一致だけで成否を判断しない。
-
----
-
-## 8. LeRobotDatasetの内容
-
-baseline recordingでは、少なくとも以下の情報が保存される。
-
-```text
-LeRobotDataset
-├── robot action
-├── robot observation state
-├── camera videos
-├── timestamp / frame information
-├── task / episode metadata
-└── dataset metadata
-```
-
-実機確認したdatasetでは、
-
-- action: 14-dimensional float data
-- observation state: 14-dimensional float data
-- camera video: 4 streams
-- dataset format: LeRobotDataset v3.0
-
-となった。
-
-camera画像はdataset内ではvideoとして保存される。Parquetにはrobot state/actionやframe/timestamp等の情報が保存される。
-
-具体的なschema例は `reference/dataset_examples/baseline/info.json` に保存している。
-
----
-
-## 9. Dataset validation
-
-### 実行
+実行:
 
 ```bash
 ./validate_dataset.sh data/DATASET_NAME
@@ -283,102 +315,57 @@ camera画像はdataset内ではvideoとして保存される。Parquetにはrobo
 ./validate_dataset.sh data/test_dataset
 ```
 
-### 目的
+validatorは主に以下を確認する。
 
-recording processが終了しただけでは、学習用datasetとして必要なファイルが揃っていることまでは保証できない。そのため、収録後にdataset自体を検証する。
+- `meta/info.json`
+- Dataset version / fps / episode count / frame count
+- action / observation.state schema
+- Parquet row count / frame index / timestamp
+- camera features
+- video resolution / average FPS
+- video先頭frameのdecode
 
-validatorでは主に以下を確認する。
+すべて通れば `[PASS]` を表示する。
 
-- `meta/info.json` が読み込める
-- Dataset version
-- fps
-- episode数
-- frame数
-- expected camera features
-- action dimension
-- observation state dimension
-- Parquet fileの存在
-- 必要columnの存在
-- row数
-- frame indexの連続性
-- timestampの単調増加
-- metadataと実データの整合性
-- video fileの存在
-- video resolution
-- average fps
-- videoの先頭frameがdecode可能か
-
-すべて通ればPASSとなる。
-
-### Checkpoint F
-
-baseline datasetについて、
-
-```bash
-./validate_dataset.sh data/DATASET_NAME
-```
-
-がPASSすれば、標準的なVLA・模倣学習用収録フローの完了とする。
-
-validatorはdatasetの構造的な健全性を確認するものであり、demonstrationの内容そのものの品質を評価するものではない。例えば、操作ミス、task failure、camera occlusion等は別途確認する必要がある。
-
----
-
-## 10. 状態量を追加した場合
-
-実機検証では、Trossen側で取得可能なexternal effortを有効化し、observation stateを14次元から28次元へ拡張したrecordingも確認した。
-
-結果として、
+Checkpoint F:
 
 ```text
-baseline:
-action             14D
-observation.state  14D
-
-external effort enabled:
-action             14D
-observation.state  28D
+[PASS]
 ```
 
-となり、追加した状態量がLeRobotDatasetのschemaおよびParquetまで反映されることを確認した。
+が出ること。
 
-この検証は、LeRobotのRobot observationへ追加された数値情報がrecording pipelineを通ってDatasetへ保存されることを確認したものである。
+validatorはDataset構造の健全性を確認する。demonstrationのtask success、操作品質、occlusion等は別途確認する。
 
-独立した外部sensorは、Trossen driver内部のstate extensionとは分けて扱う。Phase 1ではMMS101相当の高周期numeric streamとGelSight Miniを用いて、raw acquisitionをrobot recordingから分離し、同一host monotonic clockによるcausal alignmentを実機確認した。
+## 9. Baseline完了条件
 
-外部sensorの取得・alignment手順は `examples/custom_sensor/README.md`、設計理由と検証結果は `docs/03_architecture_and_extension.md` / `docs/06_validation_results.md` に記載する。
-
----
-
-## 11. Dataset収録時に残す情報
-
-再現性のため、実験datasetを作成するときは少なくとも以下を記録する。
-
-- 使用した本成果物repositoryのcommit
-- `lerobot_trossen` のcommit
-- task description
-- episode数
-- episode時間
-- camera構成
-- Arm / sensor構成に標準設定からの変更があるか
-- recording中に発生したwarning / error
-- dataset validation結果
-
-hardware構成やsoftware versionを変更した場合は、変更内容も記録する。
-
----
-
-## 12. 標準フローの完了条件
-
-VLA・模倣学習向けのbaseline data collectionでは、以下をすべて満たした時点を収録環境の動作確認完了とする。
+初回環境のacceptanceは次をすべて満たした時点で完了とする。
 
 ```text
-[ ] setupが完了
-[ ] hardware identifierを調査しconfigへ設定
-[ ] hardware checkerがREADY
-[ ] teleoperationを目視確認
-[ ] episode recordingが完了
-[ ] dataset validatorがPASS
+[ ] setup completed
+[ ] hardware identifier identified
+[ ] local configs completed
+[ ] hardware check -> READY
+[ ] teleoperation visually verified
+[ ] recording completed
+[ ] dataset validation -> PASS
 ```
 
-この6段階を通すことで、「packageが入った」「Armがpingに応答した」といった部分確認だけではなく、実際に学習用Datasetが生成されるところまでを一つのacceptance pathとして確認する。
+実機検証済みschemaやframe数の例は [06 Validation Results](06_validation_results.md) に記載する。
+
+## 10. 次に行うこと
+
+Baseline収録だけが目的ならここで完了。
+
+外部sensorを追加する場合:
+
+- [03 Architecture and Extension](03_architecture_and_extension.md)
+- [../examples/custom_sensor/README.md](../examples/custom_sensor/README.md)
+
+versionやhardwareを更新する場合:
+
+- [05 Maintenance](05_maintenance.md)
+
+問題が発生した場合:
+
+- [04 Troubleshooting](04_troubleshooting.md)

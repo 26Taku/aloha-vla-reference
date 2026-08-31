@@ -1,114 +1,162 @@
 # Troubleshooting
 
-本資料は、研究室ALOHAでPhase 1のsetup / teleoperation / recording / external sensor validation中に実際に遭遇した事項を中心に整理する。
+## 1. この資料の役割
 
-## 1. 4台すべてのArmにpingが通らない
+本資料は、**通常フローが途中で止まったときの症状別切り分け**に限定する。
 
-まずALOHA Armの電源状態とPC側network interfaceを確認する。
+通常の実行順序は [02 Data Collection](02_data_collection.md) を参照する。ここではsetupからrecordingまでの手順を再掲しない。
 
-実機検証ではArm電源OFF時に設定済みの4 Armすべてへ到達できず、電源投入後に復旧した。
+## 2. `setup.sh` が失敗する
 
-まずtemplateへ設定したIPを確認し、対象ごとにpingする。
+### `git` / `uv` が見つからない
 
 ```bash
+git --version
+uv --version
+```
+
+不足しているcommandを導入してから再実行する。
+
+### `lerobot_trossen` にlocal modificationがある
+
+`setup.sh` は既存の変更を自動破棄しない。成果物直下の `lerobot_trossen/` にlocal modificationがある場合は停止する。
+
+```bash
+git -C lerobot_trossen status --short
+```
+
+必要な変更を退避するか、clean directoryで再構築する。
+
+## 3. `check_hardware.sh` がlocal config不足で止まる
+
+tracked templateからlocal configを作成し、hardware identifierを設定する。
+
+詳細は [02 Data Collection - Hardware identification](02_data_collection.md#4-hardware-identification--local-configuration) を参照する。
+
+## 4. `REPLACE_WITH_...` が残っている
+
+```bash
+grep -RIn 'REPLACE_WITH_' \
+  config/teleop-local.yaml \
+  config/record-local.yaml
+```
+
+出力されたfieldを対象hardwareの値へ置き換える。tracked template自体はplaceholderのまま維持する。
+
+## 5. Armにpingが通らない
+
+まずArm電源とPC側network interfaceを確認する。
+
+```bash
+ip -br addr
+ip neigh
 grep -n 'arm_ip_address' config/teleop-local.yaml
+```
+
+対象IPへ個別に確認する場合:
+
+```bash
 ARM_IP=YOUR_CONFIGURED_ARM_IP
 ping -c 2 "$ARM_IP"
 ```
 
-`<configured-arm-ip>` は実際にconfigへ設定した値へ置き換える。
+4 Armすべてに到達できない場合は、個別IP誤設定より先に電源・network接続を疑う。
 
-`check_hardware.sh` のping成功はnetwork reachabilityのみを示す。driverを含む実動作は `teleoperate.sh` で確認する。
+ping成功はnetwork reachabilityのみを示す。driverを含む実動作はteleoperationで確認する。
 
-## 2. setup.shが既存repositoryを変更しない
+## 6. RealSenseが認識されない / serialが一致しない
 
-`setup.sh` は成果物直下の `lerobot_trossen/` を使用する。既存repositoryにlocal modificationがある場合は自動checkoutを拒否する。
-
-研究用途の既存forkを流用してsetup failureを回避しようとせず、成果物用clean directoryを使用する。
-
-## 3. RealSenseが認識されない / serialが一致しない
+接続deviceを再列挙する。
 
 ```bash
 rs-enumerate-devices
 ```
 
-等でdeviceとserialを確認し、`config/teleop-local.yaml` / `config/record-local.yaml` と照合する。
+またはLeRobot environmentの `pyrealsense2` を使用する。
 
-USB差し替えやcamera交換時はdevice indexではなくserialを基準にする。
+USB差し替えやcamera交換時は `/dev/videoX` indexではなくserialを基準にする。
 
-## 4. Rerun / Vulkan / EGL warning
+4台のserialが見えていてもphysical roleが誤っている場合があるため、映像と `cam_high` / `cam_low` / wrist cameraの対応も確認する。
 
-実機検証ではgraphics backend由来のwarningが表示される場合があったが、Arm controlとrecording自体が継続できたケースがある。
+## 7. Rerun / Vulkan / EGL warningが出る
 
-warning文字列だけで失敗と判断せず、以下を確認する。
+graphics backend由来のwarningだけで失敗と判断しない。
 
-- Armが正常に応答する
-- camera viewが更新される
-- control loopが継続する
-- recording終了後にDataset validatorがPASSする
+確認するもの:
 
-viewer自体が不要な切り分けではdisplayを無効化して原因を分離する。
+- Arm controlが継続している
+- camera viewが更新されている
+- processが異常終了していない
+- recording後のDataset validatorがPASSする
 
-## 5. Dataset directory already exists
+viewer自体を問題から切り離せる場合はdisplayを無効にして切り分ける。
 
-`record.sh` は既存datasetを誤上書きしないため、同名directoryがあると停止する。
+## 8. Dataset directory already exists
 
-新しいdataset名を使うか、不要であることを確認して既存datasetを別途退避・削除する。
+`record.sh` は既存datasetを上書きしない。
 
-## 6. frame数が `duration x fps` と1 frame程度ずれる
+別の `DATASET_NAME` を使用するか、既存dataが不要であることを確認してから手動で退避・削除する。
 
-10秒・30 Hzで299 frames、15秒で449 framesとなる等、実時間によるloop終了境界のため完全一致しない場合がある。
+## 9. frame数が `duration x fps` と完全一致しない
 
-固定個数一致だけで成否を判断せず、`validate_dataset.sh` でmetadata / Parquet / video / frame orderingを確認する。
+recording loopの開始・終了境界により1 frame程度ずれる場合がある。
 
-## 7. 外部ROS 2 sensor loggerが0 sample
+固定個数だけで成否を判断せず、`validate_dataset.sh` でmetadata、Parquet、frame ordering、videoを確認する。
 
-まずpublisherが実際に動作中か確認する。
+## 10. 外部ROS 2 sensor loggerが0 sample
+
+publisherが実際に動作しているかを先に確認する。
 
 ```bash
 ros2 topic list
-ros2 topic hz /force_torque/left
-ros2 topic info -v /force_torque/left
+ros2 topic hz /YOUR_TOPIC
+ros2 topic info -v /YOUR_TOPIC
 ```
 
-publisher停止をQoS mismatchと誤認しないよう、topic存在とrateを先に確認する。
+publisher停止をQoS mismatchと誤認しない。
 
-`ros2_timeseries_logger.py` のdefaultは `best_effort`。publisher条件に応じて `--qos-reliability reliable` を選べる。
+`ros2_timeseries_logger.py` はreliabilityを選択できるため、publisherのQoSに合わせる。
 
-## 8. MMS101の `/dev/mms101_*` aliasがない
-
-検証機では固定aliasが存在せず、FTDI USB serial adapterが `/dev/serial/by-id/...` に見えていた。
+## 11. USB serial deviceの固定aliasがない
 
 ```bash
 ls -l /dev/serial/by-id/
-udevadm info --query=property --name=/dev/ttyUSB0 | grep -E 'ID_(MODEL|SERIAL|SERIAL_SHORT)'
 ```
 
-`/dev/serial/by-id/` に含まれるidentifierは環境ごとに異なるためrepositoryへ固定値を埋め込まない。また、FTDI adapterのidentifierはsensor本体固有IDと同義とは限らない。adapter/sensor対応を変更する場合は再確認する。
+必要なら:
 
-## 9. UMI側MMS101と別環境のMMS101 rateが違う
+```bash
+udevadm info --query=property --name=/dev/ttyUSB0 \
+  | grep -E 'ID_(MODEL|SERIAL|SERIAL_SHORT)'
+```
 
-検証したUMI sensor workspaceのMMS101 nodeは約100 Hzだった。別のUR3用driverでは1 ms intervalを使用する実装が存在する。
+`/dev/serial/by-id/` のidentifierは環境固有であり、tracked repositoryへ固定値を入れない。
 
-「MMS101は常に1 kHz」または「常に100 Hz」と一般化せず、使用するdriver/configurationのtimer/continuous intervalと実測rateを確認する。
+USB-serial adapterのidentifierがsensor本体の固有IDと同義とは限らない点にも注意する。
 
-## 10. GelSightのadvertised FPSと実測FPSが違う
+## 12. sensorの実測rateが想定と違う
 
-検証したGelSight MiniはV4L2でMJPEG 3280x2464 @ 25 fpsをadvertiseしたが、`v4l2-ctl` / OpenCV grab / FFmpeg stream-copyでは約18.75 Hzだった。
+driver設定・timer・device modeと実測rateを確認する。
 
-camera capability表示だけでsampling rateを決めず、実際のframe timestamp/countからrateを測定する。
+sensor名だけから「常に100 Hz」「常に1 kHz」等と一般化しない。reference validationで得たrateは [06 Validation Results](06_validation_results.md) に記録している。
 
-## 11. GelSightを個別JPEG保存するとrateが低い
+## 13. GelSightのadvertised FPSと実測FPSが違う
 
-Phase 1で作成したfull-resolution JPEG-per-frame比較prototypeでは約8.6 Hzだった。これは研究室既存codeやGelSight公式codeの評価ではなく、今回作成したprototypeの処理負荷による比較結果である。
+camera capability表示と実際のsampling rateは一致しない場合がある。
 
-referenceではV4L2 MJPEGを `ffmpeg -c:v copy` で保存し、capture中のdecode/re-encodeを避ける。
+frame count / timestampから実効rateを測定する。Phase 1の実測例は [06 Validation Results](06_validation_results.md) を参照する。
 
-## 12. `ffmpeg -copyts`でoutput fileがemptyになる
+## 14. camera保存でrateが大きく低下する
 
-絶対monotonic timestampを保持した状態で、duration `-t` をoutput optionとして `-i` より後ろへ置いた試行ではempty outputになった。
+decode、resize、JPEG再encode、個別file I/O等をcapture pathへ入れるとthroughputが低下する可能性がある。
 
-本referenceでは `-t` をinput optionとして `-i` より前に置く。
+本referenceでは異FPS cameraのcanonical raw保存としてnative compressed stream copyを採用する。設計理由は [03 Architecture and Extension](03_architecture_and_extension.md) を参照する。
+
+## 15. `ffmpeg -copyts` でoutputがemptyになる
+
+absolute timestampを保持する場合、duration optionの位置に注意する。
+
+reference例では `-t` をinput optionとして `-i` より前に置く。
 
 ```bash
 ffmpeg \
@@ -125,24 +173,20 @@ ffmpeg \
   output.mkv
 ```
 
-## 13. camera alignmentで冒頭frameがmissingになる
+## 16. camera alignmentで冒頭frameがmissingになる
 
-camera loggerをrobot recordingより遅く起動すると、最初のrobot framesより前にcamera frameが存在しないため `missing` になる。これはcausal alignmentの正常な挙動である。
+camera acquisitionをrobot recordingより遅く開始すると、最初のrobot frame以前にcamera frameが存在しないためmissingになる。これはcausal alignmentとして正常。
 
-最終検証ではcamera acquisitionを先に開始し、数秒後にrobot recordingを開始する。
+cameraを先に開始し、その後robot recordingを開始する。
 
-`future frames used = 0` を維持したまま `missing = 0` になることを確認する。
+## 17. 同じcamera frameが複数robot frameへ割り当てられる
 
-## 14. 同じcamera frameが複数robot frameへ割り当てられる
+異FPS cameraをより高FPSのrobot streamへlatest-frame alignmentする場合は正常。
 
-異常ではない。例えば18.75 Hz cameraを30 Hz robot streamへcausal latest-frame alignmentすると、camera frameの再利用が必然的に発生する。
+raw imageをrobot frameごとに複製せず、mappingだけを保存する。
 
-画像をrobot frameごとに複製せず、mappingだけを保存する。
+## 18. timestampのclock semanticsが不明
 
-## 15. timestampが同じclockか不明
+source/device timestampとhost `CLOCK_MONOTONIC` が同じclockとは限らない。
 
-外部sensorの `header.stamp` やdevice timestampがhost `CLOCK_MONOTONIC` と同じとは限らない。
-
-本referenceでは、ROS 2 numeric sensorはcallback-entryの `receive_monotonic_ns` を標準alignment clockとする。GelSight/V4L2については検証環境でpacket PTSとhost `time.monotonic()` が同じdomainであることを実測確認した。
-
-別hardware/driverへ変更した場合はclock semanticsを再確認する。
+本referenceではhost側で取得したmonotonic timestampをalignment基準とする。driver/hardwareを変更した場合はclock semanticsを再確認する。

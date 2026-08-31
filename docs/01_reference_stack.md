@@ -1,20 +1,14 @@
 # Reference Stack
 
-## 1. 目的
+## 1. この資料の役割
 
-本資料では、研究室のALOHAを用いてVLA・模倣学習向けデータを収集する際の標準構成を整理する。
+本資料は、**何をbaselineとして採用したか、なぜ採用したか**を説明する。
 
-ALOHAにはTrossenの各種driverやROS 2など複数の利用方法があるが、本プロジェクトでは、teleoperationからLeRobotDatasetの作成までを一つの流れで扱える **Trossen Robotics公式 LeRobot Plugin (`lerobot_trossen`)** をデータ収集のbaselineとして採用する。
+初回セットアップや収録の操作手順はここでは扱わない。実際に作業する場合は [02 Data Collection](02_data_collection.md) を使用する。実機検証結果の数値は [06 Validation Results](06_validation_results.md) に分離する。
 
-この構成は研究室のALOHA実機で動作確認済みである。
+## 2. 採用baseline
 
----
-
-## 2. 標準構成
-
-### Software
-
-| 項目 | 採用構成 |
+| 項目 | Reference |
 |---|---|
 | Trossen integration | `TrossenRobotics/lerobot_trossen` |
 | Verified commit | `a4336933f34192a3daa7e9fb52674284bb5ae48e` |
@@ -24,152 +18,98 @@ ALOHAにはTrossenの各種driverやROS 2など複数の利用方法があるが
 | Trossen Arm library | 1.10.0 |
 | Dataset format | LeRobotDataset v3.0 |
 
-公式 `lerobot_trossen` はLeRobot向けのTrossen AI series integrationであり、Trossen側でも `uv` を用いた導入手順が提供されている。
+本成果物では最新版へ自動追従せず、実機で通したrevisionをreferenceとして固定する。versionを更新する場合の再検証条件は [05 Maintenance](05_maintenance.md) に記載する。
 
-本成果物では、検証済みcommitを固定して使用する。最新版への追従は自動では行わず、更新時にはsetup、hardware check、teleoperation、recording、dataset validationを再実行する。
+## 3. 想定hardware
 
-### Hardware
-
-実機確認時の構成は以下。
+baselineは以下の構成を対象とする。
 
 - Bimanual leader: 2 arms
 - Bimanual follower: 2 arms
 - Intel RealSense D405: 4 cameras
-- Camera views:
-  - high
-  - low
-  - left wrist
-  - right wrist
+- Camera roles:
+  - `cam_high`
+  - `cam_low`
+  - `cam_left_wrist`
+  - `cam_right_wrist`
 
-Arm IP addressとcamera serial numberは環境固有値であるため、本repositoryには実機値を保存しない。tracked templateから `config/teleop-local.yaml` / `config/record-local.yaml` を作成し、接続hardwareを調査した上で `REPLACE_WITH_...` placeholderを置き換える。local configは `.gitignore` 対象とする。
+Arm IP addressとcamera serial numberはmachine-specific identifierであり、repositoryには実機値を保存しない。tracked templateにはplaceholderを置き、利用者が対象環境を調査してlocal configへ設定する。
 
----
-
-## 3. 初回利用時のhardware identification
-
-本referenceでは、特定個体のhardware identifierをdefault configへ埋め込まない。環境構築後、teleoperationより前に以下を確認する。
-
-1. left/right follower ArmのIP address
-2. left/right leader ArmのIP address
-3. 4台のRealSense serial number
-4. 各RealSenseと `cam_high` / `cam_low` / `cam_left_wrist` / `cam_right_wrist` の物理対応
-
-RealSense serialは `pyrealsense2` またはLibrealsense toolsで列挙できる。Arm IPはcontroller/network設定を確認し、既存環境のIPを推測で流用しない。
-
-`robot.id` / `teleop.id` はLeRobot上のlogical identifierであり、hardware serialではないため、通常はtemplateの値を維持する。
-
-設定後は `check_hardware.sh` でlocal configのplaceholder残存、teleoperation/recording config間のhardware identity、実機への到達性を確認する。
-
----
+この設計は「特定のALOHA個体でのみ動く設定」を標準化しないためのものである。具体的なhardware identification手順は [02 Data Collection](02_data_collection.md) に一本化する。
 
 ## 4. この構成をbaselineとする理由
 
-本プロジェクトの目的は、ALOHAそのものを制御することではなく、**VLA・模倣学習に利用できるデータを収集すること**である。
+本プロジェクトの主目的は、ALOHAを用いてVLA・模倣学習向けDatasetを再現可能に収集することである。
 
 そのため、以下を一つのsoftware stackで扱えることを重視した。
 
 1. Leader-Follower teleoperation
-2. Robot state / actionの取得
-3. 複数cameraの取得
-4. Episode単位のrecording
+2. Robot state / action acquisition
+3. 複数camera acquisition
+4. Episode recording
 5. LeRobotDatasetへの保存
-6. 後段の学習処理との接続
+6. LeRobot系training / inference stackへの接続性
 
-LeRobotではrobotを共通interfaceとして扱い、observationの取得とactionの送信をrecordingやpolicy側から利用する構造になっている。Trossen公式Pluginを使用することで、ALOHA固有のhardware interfaceとLeRobotのrecording pipelineの間を公式実装で接続できる。
-
-このため、本プロジェクトではVLA向けデータ収集の最初の選択肢としてこの構成を使用する。
-
----
+Trossen公式LeRobot pluginを使用することで、ALOHA固有hardware interfaceとLeRobot recording pipelineの接続をvendor側の公開実装へ寄せられる。研究室固有forkをbaselineにしないことで、project-specific変更と標準構成を分離できる。
 
 ## 5. 他の構成との使い分け
 
-### Trossen公式 LeRobot Plugin
+| 構成 | 本referenceでの位置づけ | 主な用途 |
+|---|---|---|
+| Trossen公式 LeRobot Plugin | **標準baseline** | teleoperation、RGB、state/action、LeRobotDataset収録 |
+| ROS 2 | optional adapter | 外部sensor driver、独立stream、他ROS nodeとの連携 |
+| Trossen driver直接利用 | project-specific | 独自制御、低レベルhardware access |
+| 研究用fork | project-specific | 既存研究機能を明示的に必要とする場合 |
 
-**標準選択。**
+### ROS 2をbaselineにしない理由
 
-以下の場合に使用する。
+外部sensorのdriverとしてROS 2が有用な場合はあるが、すべてのsensorをROS 2へ統一すること自体は目的ではない。
 
-- ALOHAのteleoperation dataを収集したい
-- RGB cameraとrobot state/actionをまとめて保存したい
-- LeRobotDatasetを利用したい
-- LeRobot上のpolicyや、LeRobotDatasetを入力にできる学習系へ接続したい
+外部sensorは取得rateやinterfaceが異なるため、LeRobotへ直接統合する場合と、ROS 2 / V4L2 / vendor SDK等で独立取得する場合を使い分ける。詳細は [03 Architecture and Extension](03_architecture_and_extension.md) を参照する。
 
-本成果物のQuick Startはこの構成を対象とする。
+### 既存研究forkをbaselineにしない理由
 
-### ROS 2
+研究用途で変更されたrepositoryは、そのprojectには有用でも、どの変更が標準動作に必要か判別しにくい。
 
-本プロジェクトではALOHAの標準的なteleoperation / recording経路としては使用しない。
+本成果物では公式repositoryのclean revisionを別環境で検証し、研究固有機能が必要な案件だけ差分として追加する方針を採る。
 
-一方で、以下のような場合は併用を検討する。
+## 6. Referenceとするもの / 環境ごとに決めるもの
 
-- 外部sensorのdriverがROS 2として提供されている
-- 高周期sensorを独立して取得したい
-- 他のROS 2 nodeとの連携が必要
-- timestamp付きのsensor streamを別系統で保持したい
+固定するもの:
 
-外部sensorを追加する場合に、必ずROS 2が必要という意味ではない。LeRobot側へ直接統合する方法と、ROS 2等で独立取得して同期する方法を用途に応じて選択する。
+- upstream repository
+- verified commit
+- package version
+- Dataset version
+- baseline schema
+- validation procedure
 
-詳細は `docs/03_architecture_and_extension.md` に記載する。
+環境ごとに確認するもの:
 
-### Trossen driverを直接利用する構成
+- Arm IP address
+- camera serial number
+- camera physical roleとの対応
+- optional external sensor device path / serial
+- data storage policy
 
-独自制御や低レベルのhardware accessが必要な場合には候補となる。
+環境固有値をtracked fileへ残さないルールは [05 Maintenance](05_maintenance.md) に記載する。
 
-ただし、VLA向けdataset収集だけが目的であれば、teleoperation、camera、dataset writer等を別途組み合わせる必要が生じるため、本プロジェクトのbaselineにはしない。
-
-### 既存の研究用fork
-
-研究室PC上には研究用途で変更された既存環境が存在するが、本成果物では標準構成として使用しない。
-
-本プロジェクトでは既存環境に変更を加えず、別ディレクトリにTrossen公式repositoryからclean environmentを構築して検証した。
-
-既存fork固有の機能が必要な案件では、その差分を確認した上で個別に利用する。
-
----
-
-## 6. 実機で確認済みの範囲
-
-以下は研究室のALOHAで実際に確認済み。
-
-- clean environmentでのdependency installation
-- 4台のTrossen Armへの接続
-- RealSense D405 4台の認識
-- 左右Leader-Follower teleoperation
-- Rerun Viewerでのcamera / state表示
-- 4 cameraを含むepisode recording
-- LeRobotDataset v3.0としての保存
-- baseline datasetの14-dimensional action / 14-dimensional observation state
-- Trossen側のexternal effortを追加した28-dimensional observation stateの保存
-- 保存後datasetのmetadata / Parquet / videoのvalidation
-- MMS101 ROS 2 streamのnative-rate取得（約100 Hz）とALOHA frameへのcausal alignment
-- GelSight Miniのnative MJPEG取得（実効18.753 Hz）とALOHA 30 Hz recordingへのcausal alignment
-
-`external effort` はTrossen driver内部のstate extension確認である。独立した外部sensorについては別経路として、raw acquisition + host timestamp + derived alignmentを実機確認した。詳細は `docs/03_architecture_and_extension.md` と `docs/06_validation_results.md` を参照する。
-
----
-
-## 7. 標準構成から変更する場合
-
-以下を変更する場合は、Quick Startをそのまま使用せず、関連箇所を確認する。
+## 7. Baselineから変更する場合
 
 | 変更内容 | 主に確認する資料 |
 |---|---|
-| Arm IP / camera serial | `config/` |
-| Camera追加・変更 | `docs/03_architecture_and_extension.md` |
-| Robot state追加 | `docs/03_architecture_and_extension.md` |
-| 外部sensor追加 | `docs/03_architecture_and_extension.md` |
-| LeRobot / Trossen Plugin更新 | `docs/05_maintenance.md` |
-| Dataset schema変更 | `docs/02_data_collection.md` / `docs/06_validation_results.md` |
-
----
+| Arm / RealSenseを交換 | [02 Data Collection](02_data_collection.md), [05 Maintenance](05_maintenance.md) |
+| Camera / sensorを追加 | [03 Architecture and Extension](03_architecture_and_extension.md) |
+| Robot stateを追加 | [03 Architecture and Extension](03_architecture_and_extension.md) |
+| LeRobot / Trossenを更新 | [05 Maintenance](05_maintenance.md) |
+| Dataset schemaを変更 | [03 Architecture and Extension](03_architecture_and_extension.md), [05 Maintenance](05_maintenance.md) |
+| 実機確認済み範囲を確認 | [06 Validation Results](06_validation_results.md) |
 
 ## 8. 公式資料
 
 - Trossen Robotics LeRobot integration  
   https://github.com/TrossenRobotics/lerobot_trossen
-
 - Trossen Robotics LeRobot Installation Guide  
   https://docs.trossenrobotics.com/trossen_arm/main/tutorials/lerobot_plugin/setup.html
-
 - Hugging Face LeRobot documentation  
   https://huggingface.co/docs/lerobot/

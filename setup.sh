@@ -115,11 +115,5 @@ mkdir -p "$ROOT_DIR/data" "$ROOT_DIR/logs"
 echo "=== Setup complete ==="
 echo
 echo "Next:"
-echo "  1. Create machine-specific local configs:"
-echo "     cp config/teleop-template.yaml config/teleop-local.yaml"
-echo "     cp config/record-template.yaml config/record-local.yaml"
-echo "  2. Identify Arm IP addresses and RealSense serial numbers."
-echo "  3. Replace all REPLACE_WITH_... placeholders in both local configs."
-echo "  4. Run: ./check_hardware.sh"
-echo
-echo "See README.md -> Quick Start for the complete first-use procedure."
+echo "  Follow docs/02_data_collection.md from 'Hardware identification / local configuration'."
+echo "  Do not run teleoperation or recording before completing the local hardware config."

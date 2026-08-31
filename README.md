@@ -1,56 +1,14 @@
 # ALOHA VLA Data Collection Reference
 
-ALOHAを用いて、VLA・模倣学習向けのデータ収集を開始するためのリファレンスです。
+ALOHAでVLA・模倣学習向けデータ収集を始めるためのreference repositoryです。
 
-Trossen Robotics公式のLeRobot Pluginをベースに、実機で確認したsoftware構成・確認用スクリプト・sensor extensionの設計をまとめています。本リポジトリは特定のALOHA個体に依存しないよう、Arm IP addressやcamera serial numberなどのhardware固有値を含みません。
+Trossen Robotics公式 `lerobot_trossen` をbaselineとして、環境構築、hardware確認、teleoperation、LeRobotDataset収録、dataset validationまでを一つの再現可能な流れとして整理しています。外部sensorについては、baselineを複雑化させない形で追加するためのarchitectureとreference codeを別途用意しています。
 
-本リポジトリでは、単に公式ドキュメントの手順を再掲するのではなく、以下を整理します。
+## Start here
 
-- VLA向けデータ収集に使用する標準構成
-- hardware identificationからteleoperation、recordingまでの手順
-- 収録したDatasetの確認方法
-- カメラや外部センサを追加する際の標準architectureとreference実装
-- 実機検証中に確認した問題と対処方法
+**初めてこのrepositoryを使う場合は、[docs/02_data_collection.md](docs/02_data_collection.md) を上から順に実行してください。**
 
-## 1. 対象
-
-以下の流れでALOHAのデータを収集する場合を対象とします。
-
-```text
-Leaderによる操作
-        ↓
-ALOHA Follower
-        ↓
-Robot state / action + RGB cameras
-        ↓
-LeRobotDataset
-        ↓
-VLA・模倣学習
-```
-
-標準構成では、Trossen Robotics公式の `lerobot_trossen` を使用します。
-
-## 2. 検証済み環境
-
-ALOHA実機で、以下を確認しています。
-
-- Trossen Robotics公式 `lerobot_trossen`
-- verified commit: `a4336933f34192a3daa7e9fb52674284bb5ae48e`
-- LeRobot 0.6.0
-- Python 3.12
-- Trossen Arm 4台
-- Intel RealSense D405 4台
-- 左右Leader-Followerによるteleoperation
-- 4視点RGBを含むrecording
-- LeRobotDataset v3.0形式での保存
-
-詳細な構成は [docs/01_reference_stack.md](docs/01_reference_stack.md) を参照してください。
-
-外部sensorについては、MMS101相当の高周期numeric streamとGelSight Miniを用いて、native-rate acquisitionとcausal timestamp alignmentまで実機確認しています。標準baselineのsetupにROS 2やGelSight固有softwareを必須化せず、optional referenceとして `examples/custom_sensor/` に分離しています。
-
-## 3. Quick Start
-
-初回利用時は、以下を上から順に実行します。hardware固有値を調べる前にteleoperationやrecordingへ進まないでください。
+初回利用の正式な手順は `docs/02_data_collection.md` に一本化しています。READMEは入口と全体像のみを示し、詳細手順は重複して記載しません。
 
 ```text
 Repository取得
@@ -70,200 +28,83 @@ Recording
 Dataset validation
 ```
 
-### 3.0 Repository取得と前提条件
+途中で問題が発生した場合は [docs/04_troubleshooting.md](docs/04_troubleshooting.md) を参照してください。
 
-検証済み環境はUbuntu 24.04です。少なくとも `git` と `uv` が必要です。`uv` が未導入の場合は、公式手順を参照してください。
+## このrepositoryでできること
 
-- uv installation: https://docs.astral.sh/uv/getting-started/installation/
+Baseline:
 
-GitHubから利用する場合:
+- Trossen公式LeRobot pluginの検証済みrevisionを再現
+- Bimanual leader-follower teleoperation
+- RealSense 4視点を含むLeRobotDataset v3 recording
+- dataset metadata / Parquet / videoのvalidation
 
-```bash
-git clone https://github.com/26Taku/aloha-vla-reference.git
-cd aloha-vla-reference
-```
+Optional extension:
 
-ZIP等で受け取った場合は展開し、`setup.sh` と `README.md` が存在するrepository rootへ移動してください。
+- robot frameへのhost monotonic timestamp付与
+- 高周期numeric sensorのnative-rate保存とcausal alignment
+- asynchronous cameraのnative compressed保存とcausal alignment
 
-```bash
-pwd
-ls README.md setup.sh
-```
+外部sensorはbaseline Quick Startの必須要件ではありません。
 
-### 3.1 Environment setup
+## Documentation map
 
-```bash
-./setup.sh
-```
+| 読みたい内容 | 資料 | 役割 |
+|---|---|---|
+| 初回セットアップから収録完了まで進めたい | [02 Data Collection](docs/02_data_collection.md) | **唯一の詳細操作マニュアル** |
+| なぜこのsoftware stackを採用したか知りたい | [01 Reference Stack](docs/01_reference_stack.md) | baselineの選定理由・固定version・代替構成 |
+| camera / F/T / tactile等を追加したい | [03 Architecture and Extension](docs/03_architecture_and_extension.md) | data flow・timestamp・sensor extension設計 |
+| 実行中の問題を切り分けたい | [04 Troubleshooting](docs/04_troubleshooting.md) | 症状別の確認項目と対処 |
+| hardware / LeRobot / Trossenを更新したい | [05 Maintenance](docs/05_maintenance.md) | 更新時の変更箇所・再検証条件・public化方針 |
+| どこまで実機で確認済みか知りたい | [06 Validation Results](docs/06_validation_results.md) | 実機検証結果と未検証範囲 |
+| Phase 1で何を調査・実装したか確認したい | [Implementation Report](implementation_report.md) | 納品・実施内容の要約 |
 
-Trossen公式リポジトリを検証済みcommitで取得し、必要なPython環境を構築します。
-
-`setup.sh` 完了後、**すぐに `check_hardware.sh` を実行するのではなく、次節でlocal configを作成・編集してください。**
-
-### 3.2 Hardware identification and configuration
-
-**初回利用時は必須です。** tracked templateには意図的に `REPLACE_WITH_...` placeholderが入っています。まずmachine-specificなlocal configを作成します。
-
-```bash
-cp config/teleop-template.yaml config/teleop-local.yaml
-cp config/record-template.yaml config/record-local.yaml
-```
-
-`*-local.yaml` は `.gitignore` 対象です。実機のIP addressやserial numberをpublic repositoryへ誤ってcommitしないため、hardware固有値はlocal configだけに記入します。
-
-確認する項目:
-
-- left / right follower ArmのIP address
-- left / right leader ArmのIP address
-- `cam_high`, `cam_low`, `cam_left_wrist`, `cam_right_wrist` に対応するRealSense serial number
-
-PC側networkの確認には、例えば以下を使用できます。
-
-```bash
-ip -br addr
-ip neigh
-```
-
-Arm IPはcontroller/network設定と物理的なleft/right対応を確認してください。本リポジトリはArm IPを自動推定しません。
-
-RealSenseはsetup後、次のように接続中deviceのmodelとserialを列挙できます。
-
-```bash
-cd lerobot_trossen
-uv run python - <<'PY'
-import pyrealsense2 as rs
-
-for dev in rs.context().query_devices():
-    print(
-        dev.get_info(rs.camera_info.name),
-        dev.get_info(rs.camera_info.serial_number),
-    )
-PY
-cd ..
-```
-
-serial一覧だけでは物理位置は分からないため、viewerで映像を確認する、またはcameraを1台ずつ確認する等の方法で、4つのlogical camera nameとの対応を決めます。
-
-`config/teleop-local.yaml` と `config/record-local.yaml` で設定するfieldは以下です。
+## Repository layout
 
 ```text
-robot.left_arm_ip_address
-robot.right_arm_ip_address
-teleop.left_arm_ip_address
-teleop.right_arm_ip_address
-robot.cameras.<camera_name>.serial_number_or_name
+.
+├── README.md
+├── setup.sh
+├── check_hardware.sh
+├── teleoperate.sh
+├── record.sh
+├── validate_dataset.sh
+├── config/
+│   ├── teleop-template.yaml
+│   └── record-template.yaml
+├── scripts/
+├── examples/
+│   └── custom_sensor/
+├── docs/
+│   ├── 01_reference_stack.md
+│   ├── 02_data_collection.md
+│   ├── 03_architecture_and_extension.md
+│   ├── 04_troubleshooting.md
+│   ├── 05_maintenance.md
+│   └── 06_validation_results.md
+└── implementation_report.md
 ```
 
-`robot.id: bimanual_follower` と `teleop.id: bimanual_leader` はLeRobot上のlogical identifierであり、Armのhardware serialやIP addressではありません。通常は変更不要です。
+Arm IP addressやcamera serial number等のmachine-specific identifierはtracked fileへ保存しません。初回利用時にtemplateからGit管理外のlocal configを作成し、対象hardwareを調査して設定します。
 
-local configは任意のeditorで編集できます。例:
+## Reference baseline
 
-```bash
-nano config/teleop-local.yaml
-nano config/record-local.yaml
-```
-
-編集後、placeholderが残っていないことを確認します。**次のコマンドが無出力になること**が完了条件です。
-
-```bash
-grep -RIn 'REPLACE_WITH_' \
-  config/teleop-local.yaml \
-  config/record-local.yaml
-```
-
-`*-local.yaml` はGit管理対象外です。次のコマンドでignoreされていることも確認できます。
-
-```bash
-git check-ignore -v \
-  config/teleop-local.yaml \
-  config/record-local.yaml
-```
-
-### 3.3 Hardware check
-
-config編集後、ALOHAとカメラの電源・接続を確認してから、
-
-```bash
-./check_hardware.sh
-```
-
-を実行します。
-
-以下をまとめて確認します。
-
-- placeholderが残っていないこと
-- teleoperation用configとrecording用configのhardware identityが一致すること
-- Armへのネットワーク接続
-- RealSenseの認識とserial mapping
-- 使用するソフトウェアversion
-- データ保存先
-
-`[READY]` が表示されたら次へ進みます。
-
-> Armへのping確認はネットワーク到達性の確認です。Robot driverを含めた実際の動作確認は次のteleoperationで行います。
-
-### 3.4 Teleoperation
-
-```bash
-./teleoperate.sh
-```
-
-Rerun Viewerを確認しながら、以下を確認します。
-
-- 左右のArmが正しく対応して動くこと
-- Gripperが正しく動くこと
-- 4台のカメラ映像が期待したphysical viewと一致すること
-
-終了時は `Ctrl+C` を使用します。
-
-### 3.5 Recording
-
-例えば、10秒のepisodeを1回収録する場合、
-
-```bash
-./record.sh test_dataset "Pick and place an object" 1 10
-```
-
-とします。
-
-収録データはデフォルトではローカルに保存され、Hugging Face Hubにはuploadしません。
-
-### 3.6 Dataset validation
-
-収録後、
-
-```bash
-./validate_dataset.sh data/test_dataset
-```
-
-を実行します。
-
-Dataset metadata、Parquet、frame数、timestamp、camera videoなどを確認し、問題がなければPASSを表示します。
-
-## 4. Optional external sensors
-
-robot FPSと取得周期が異なるsensorを追加する場合は、まず [examples/custom_sensor/README.md](examples/custom_sensor/README.md) と [docs/03_architecture_and_extension.md](docs/03_architecture_and_extension.md) を参照してください。
-
-標準原則は、raw sensorを無理に30 Hzへ落とさず、raw dataと実timestampを保持し、policy用の同期表現を後処理で生成することです。
+実機検証したbaseline:
 
 ```text
-High-rate numeric sensor -> native-rate JSONL -> causal current/history view
-Async camera             -> native compressed video -> causal latest-frame view
+TrossenRobotics/lerobot_trossen
+verified commit: a4336933f34192a3daa7e9fb52674284bb5ae48e
+LeRobot:         0.6.0
+Python:          3.12
+Dataset:         LeRobotDataset v3.0
 ```
 
-これらはbaseline Quick Startとは独立したoptional extensionです。
+この構成を採用した理由と代替構成との使い分けは [docs/01_reference_stack.md](docs/01_reference_stack.md) に記載しています。
 
-## 5. 次に読む資料
+## Verification scope
 
-- [Reference Stack](docs/01_reference_stack.md): 使用するsoftware構成、hardware identificationと設定方針
-- [Data Collection](docs/02_data_collection.md): hardware check、teleoperation、recording、Datasetの詳細
-- [Architecture and Extension](docs/03_architecture_and_extension.md): ALOHAからLeRobotDatasetまでのコード構造と、camera・sensor追加時の変更箇所
-- [Troubleshooting](docs/04_troubleshooting.md): 実機検証で確認した問題と対処
-- [Maintenance](docs/05_maintenance.md): hardware交換・version更新時の確認方法
-- [Validation Results](docs/06_validation_results.md): 実機で確認済みの範囲
+Baselineのclean setup、4 Arm接続、bimanual teleoperation、RealSense 4視点recording、LeRobotDataset v3保存、dataset validationを実機確認しています。
 
-## 6. Verification scope
+外部sensorについては、高周期numeric streamとGelSight Mini 1台を用いて、同一host monotonic clockによるconcurrent acquisitionとcausal alignmentまで確認しています。
 
-本リポジトリでは、実際にALOHAで確認した内容と、設計・コード調査のみの内容を区別して記載します。
-
-実機確認済みのbaselineに加え、高周期F/T streamと非同期GelSight cameraについて、同一host clockによるconcurrent acquisitionとcausal alignmentを確認しています。hardware-trigger同期、GelSight 2台同時capacity、VLA training/inferenceはPhase 1の検証範囲外です。
+hardware-trigger同期、GelSight 2台同時capacity、VLA training / inferenceはPhase 1の検証範囲外です。詳細な数値は [docs/06_validation_results.md](docs/06_validation_results.md) を参照してください。

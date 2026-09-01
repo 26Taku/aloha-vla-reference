@@ -2,17 +2,23 @@
 
 ## 1. この文書の役割
 
-本書は、本reference作成で行った**調査、選定、実装、実機検証、制約**を納品・レビュー向けに要約する。
+本書は、本reference作成で行った**調査、選定、実装、設計判断、実機検証、制約**を納品・レビュー向けに要約する。
 
-baselineの操作マニュアルは `docs/02_data_collection.md`、sensor extensionのend-to-end操作・設計マニュアルは `docs/03_architecture_and_extension.md`、各sensor reference scriptのCLI仕様は `examples/custom_sensor/README.md`、実機検証結果は `docs/06_validation_results.md` を参照する。
+利用者向けのbaseline操作は `docs/02_data_collection.md`、sensor extensionのend-to-end操作・設計は `docs/03_architecture_and_extension.md`、実測値は `docs/06_validation_results.md` を正とする。
+
+---
 
 ## 2. 目的
 
-ALOHAについて、初見の利用者が環境構築からteleoperation、実データ収録まで再現でき、今後のVLA・模倣学習案件でsoftware構成やsensor extension方法を毎回ゼロから調査しなくて済むreferenceを作成した。
+ALOHAについて、初見の利用者がsoftware setupからteleoperation、実Dataset収録まで再現でき、camera・F/T・tactile等の追加sensorについても既存の取得環境を再利用しながら共通のintegration pathへ接続できるreferenceを作成した。
 
-対象はdata collectionとsensor extensionである。model training / inferenceは本成果物の対象外とする。
+Model training / inferenceそのものは本書の実機validation範囲外とする。
+
+---
 
 ## 3. 採用baseline
+
+標準構成にはTrossen Robotics公式`lerobot_trossen` pluginを採用し、実機検証済みrevisionを固定した。
 
 ```text
 TrossenRobotics/lerobot_trossen
@@ -22,18 +28,20 @@ Python 3.12
 LeRobotDataset v3.0
 ```
 
-主な採用理由:
+採用理由:
 
-- Trossen AI seriesのhardware integrationがTrossen公式として提供される
-- leader-follower teleoperation、robot state/action、複数camera、LeRobotDataset recordingを同一stackで扱える
-- LeRobot系policyへの接続点が明確
-- project-specific forkとbaselineを分離できる
+- Trossen AI seriesのhardware integrationが公式に提供される
+- leader-follower teleoperation、robot state/action、複数camera、Dataset recordingを同一stackで扱える
+- LeRobotDatasetを後段の学習stackへ接続しやすい
+- 研究室固有forkをbaseline dependencyにしなくてよい
 
-選定理由の詳細は `docs/01_reference_stack.md` に記載する。
+既存研究forkは変更せず、clean environmentでreference stackを検証した。
 
-## 4. Baseline data collectionの実装
+---
 
-整理したwrapper / checker:
+## 4. 実装成果物
+
+### 4.1 Baseline workflow
 
 ```text
 setup.sh
@@ -43,205 +51,198 @@ record.sh
 validate_dataset.sh
 ```
 
-役割:
+### 4.2 Hardware identityとoperational configの分離
 
-- `setup.sh`: upstream取得、verified commit固定、dependency setup
-- `check_hardware.sh`: hardware config、Arm reachability、RealSense、software version、storageを事前確認
-- `teleoperate.sh`: teleoperation用runtime configを生成して起動
-- `record.sh`: recording用runtime configを生成し、task / episode条件を指定してLeRobotDatasetを収録
-- `validate_dataset.sh`: metadata、Parquet、schema、videoを検証
-
-## 5. Hardware configurationの一元化
-
-machine-specific hardware identityは1つのGit管理外fileに集約した。
+Machine-specific identityを1 fileへ集約した。
 
 ```text
-config/hardware-local.yaml
+config/hardware-template.yaml    tracked
+config/hardware-local.yaml       local / gitignored
 ```
 
-tracked file:
+Operational settingはtracked templateとして保持する。
 
 ```text
-config/hardware-template.yaml
 config/teleop-template.yaml
 config/record-template.yaml
-scripts/build_runtime_config.py
 ```
 
-役割:
+Wrapper実行時に`hardware-local.yaml`とoperational templateを結合し、`.runtime/`以下へcomplete configを生成する。
 
 ```text
 hardware-local.yaml
-    4 Arm IP + 4 RealSense serial
-
-teleop-template.yaml
-    teleoperation固有設定
-
-record-template.yaml
-    recording固有設定
-
+      +
+teleop-template.yaml / record-template.yaml
+      ↓
 build_runtime_config.py
-    hardware identityを用途別templateへ注入
+      ↓
+.runtime/*.yaml
 ```
 
-各wrapperは `.runtime/` 以下へcomplete LeRobot configを生成する。
+これにより、Arm IPやcamera serialを複数fileへ重複入力せず、tracked repositoryへmachine-specific identifierを保存しない構成にした。
 
-この構成により、同じArm IP / camera serialをteleoperation用とrecording用の2ファイルへ重複入力する必要がなくなった。camera serialはruntime生成時に文字列へ正規化する。
+### 4.3 External sensor reference
 
-## 6. Hardware identification
+- `record_with_timestamps.py`: robot frame host timestamp sidecar
+- `ros2_timeseries_logger.py`: generic ROS 2 numeric/time-series logger
+- `align_timeseries.py`: causal latest-sample alignment
+- `build_sensor_windows.py`: causal history-window manifest
+- `validate_alignment.py`: numeric alignment validation
+- `camera/extract_mkv_timestamps.py`: asynchronous camera packet timestamp export
+- `camera/align_camera_frames.py`: camera causal latest-frame alignment
 
-Arm:
+---
+
+## 5. Sensor extension設計
+
+Sensor implementationそのものを標準化するのではなく、**ALOHAへ接続するinterface boundaryと、その境界以降のvalidation pathを標準化する**方針を採用した。
 
 ```text
-PC network確認
-    ↓
-trossen-arm discover
-    ↓
-trossen-arm identify --ip ...
-    ↓
-physical Armとの対応確定
+sensor-specific implementation
+        ↓
+integration interface
+        ↓
+native raw acquisition + host timestamp
+        ↓
+concurrent ALOHA recording
+        ↓
+causal alignment
+        ↓
+validation / policy-specific derived view
 ```
 
-RealSense:
-
-```text
-lerobot-find-cameras realsense
-    ↓
-serialごとの画像保存
-    ↓
-physical camera roleとの対応確定
-```
-
-fresh checkoutからこの経路を実機で確認した。
-
-## 7. Teleoperation safety
-
-実機検証で、Leaderが操作可能になってからFollower追従loop開始まで短い時間差が生じる場合があることを確認した。
-
-追従開始前にLeaderを大きく移動した試行では、追従開始時にFollowerがLeaderの現在姿勢へ急速に移動し、joint velocity limitで停止した。
-
-利用者向け手順には、teleoperation起動直後はLeaderを保持し、小さな動きへFollowerが連続追従することを確認してから通常操作を開始する手順を追加した。
-
-また、error停止姿勢からControllerの電源を切ると保持力が失われArmが落下するため、power cycle前にArmを支持する安全手順を `docs/02_data_collection.md` と `docs/04_troubleshooting.md` に記載した。
-
-## 8. Sensor extensionで解決する問題
-
-外部sensor追加では、次を扱う必要がある。
-
-- sensorごとのnative / actual rate
-- robot/control rateとpolicy inference rate
-- ROS 2、V4L2、vendor SDK等のinterface
-- source/device clockとhost clock
-- high-rate raw dynamicsの保持
-- robot frameとのcausal alignment
-
-本referenceでは次を共通境界とする。
+共通原則:
 
 ```text
 sensor acquisition rate != robot/control rate != policy rate
 
 raw data + real timestamp          = canonical
 policy-specific synchronized view = derived
+future sample/frame                = prohibited in causal alignment
 ```
 
-## 9. Sensor architecture
+この設計により、vendor SDK、研究室既存driver、ROS 2 node、V4L2 camera等の既存資産を置き換える必要はない。利用者はsensor streamを取得可能な状態まで準備し、03で定義したinterface contractへ合わせる。interfaceが一致しない場合のみthin adapterを追加する。
 
-### LeRobot observationへの直接統合
+Pattern BではROS 2 numeric stream、Pattern CではV4L2 asynchronous cameraを具体例としてend-to-end validationした。
 
-robot FPS程度で取得でき、robot frameごとに1値/1frameで十分なsensorに使用する。
+---
 
-### Native-rate numeric sidecar
+## 6. Sensor-specific codeのprovenance / distribution boundary
 
-F/T、IMU等の高周期numeric streamをnative / actual rateで保存し、robot timestampからcausal latest-valueまたはhistory-windowを生成する。
+### MMS101
 
-### Asynchronous camera
+検証で使用したROS 2 driverには複数の開発・修正履歴があるため、sensor-specific driver sourceは本referenceへ含めない。
 
-robot FPSと異なるcameraをnative compressed streamで保存し、frame/packet timestampからcausal latest-frame mappingを生成する。
-
-### Hardware synchronization
-
-software timestampで不足するtaskではhardware trigger、共有clock、PTP等を対象hardwareに合わせて設計する。
-
-共通の実行フロー、方式選択、MMS101 / GelSight Miniの実機検証例は `docs/03_architecture_and_extension.md` に記載する。
-
-## 10. External sensor reference implementation
-
-- `record_with_timestamps.py`: robot frame host timestamp sidecar
-- `ros2_timeseries_logger.py`: generic numeric/time-series acquisition
-- `align_timeseries.py`: causal latest-sample alignment
-- `validate_alignment.py`: causality / missing / age等の検証
-- `build_sensor_windows.py`: causal history-window manifest
-- `extract_mkv_timestamps.py`: asynchronous camera packet timestamp export
-- `align_camera_frames.py`: causal latest-frame alignment
-
-`examples/custom_sensor/README.md` には各scriptのCLI / input / output仕様を記載し、実行順序は `docs/03_architecture_and_extension.md` に一本化する。
-
-## 11. Sensor architecture validation
-
-### High-rate numeric stream
+Reference側は次のinterfaceだけを要求する。
 
 ```text
-native-rate acquisition
-+ concurrent ALOHA recording
-+ robot frame timestamp
-+ causal latest-sample alignment
-+ history-window generation
+running numeric stream
+known message/data format
+actual rateを測定可能
+hostで受信timestampを取得可能
 ```
 
-まで実機確認した。
+実機では`geometry_msgs/msg/WrenchStamped`を使用し、MMS101固有workspaceをsubscriber側でsourceしないclean shellからgeneric loggerへ接続できることを確認した。
 
-### Asynchronous camera
+### GelSight Mini
 
-GelSight Mini 1台で、
+研究室固有helper / ROS 2 wrapperをreference dependencyにせず、Linux V4L2 + FFmpegのnative compressed captureを採用した。GelSight固有SDK、marker tracking、depth等が必要な場合はsensor-specific layerで別途扱う。
+
+この分離により、provenanceが不明確な研究室内codeを再配布せず、ALOHA integration側だけを独立したreferenceとして提供できる。
+
+---
+
+## 7. Baseline実機検証で得た運用上の知見
+
+Teleoperation起動時、Leaderが操作可能になってからFollower follow loop開始まで短い時間差が生じる場合があった。follow開始前にLeaderを大きく移動すると、Followerが蓄積したpose gapを急に解消しようとしてjoint velocity limitで停止する試行があった。
+
+このため、起動直後はLeaderを保持し、小さなLeader motionへFollowerが連続追従することを確認してから通常操作を開始する手順を`docs/02_data_collection.md` / `docs/04_troubleshooting.md`へ反映した。
+
+また、error停止状態からArm Controllerの電源を切ると保持力が失われるため、power cycle前にArmを物理的に支持し、落下経路を空ける安全手順を採用した。
+
+---
+
+## 8. 実機検証の要約
+
+Baseline:
 
 ```text
-V4L2 MJPEG native compressed acquisition
-+ packet timestamp保持
-+ concurrent ALOHA recording
-+ causal latest-frame alignment
+clean setup / fixed upstream revision      PASS
+hardware preflight                         PASS
+bimanual teleoperation                     PASS
+RealSense 4-view recording                 PASS
+LeRobotDataset v3 validation               PASS
+configuration-unified end-to-end path      PASS
 ```
 
-まで確認した。
-
-実測値は `docs/06_validation_results.md` に集約する。
-
-## 12. GelSight code provenance
-
-確認したGelSight関連codeを次のように区別した。
-
-- GelSight Inc.公式 `gelsightinc/gsrobotics`: GelSight Mini用OpenCV based SDK / demo
-- project-specific helper: 公式構造をベースに変更されたもの
-- project-specific ROS 2 publisher: helperを利用するwrapper
-- 本repositoryのcamera reference: V4L2/FFmpeg + timestamp alignmentとして独立実装
-
-本repositoryへvendor / upstream sourceをコピーする場合はlicenseと出典を確認する。
-
-## 13. End-to-end validation
-
-fresh cloneから、
+Pattern B — high-rate numeric:
 
 ```text
-setup
--> hardware identification
--> hardware-local.yaml
--> hardware check
--> teleoperation
--> recording
--> dataset validation
+clean-shell interface boundary             PASS
+native acquisition                         PASS
+ALOHA concurrent recording                 PASS
+299 / 299 causal alignment                 PASS
+missing / future                           0 / 0
+200 ms history window                      PASS
 ```
 
-を通した。
+Pattern C — asynchronous camera:
 
-hardware configuration一元化後にも同じpathを再実行し、hardware check、teleoperation、one-episode recording、dataset validationまで完了した。
+```text
+V4L2 native compressed acquisition         PASS
+packet timestamp export                    PASS
+ALOHA concurrent recording                 PASS
+299 / 299 causal alignment                 PASS
+missing / future                           0 / 0
+```
 
-## 14. 制約
+詳細なrate、frame数、age distributionは`docs/06_validation_results.md`に集約した。
 
-software synchronizationは同一host monotonic clockを基準とする。hardware-trigger levelの同期、sub-millisecond synchronization、複数PC間clock synchronizationは別途設計が必要である。
+---
 
-GelSight 2台同時使用時のcapacity、外部sensorをpolicyへencodeする具体方式、VLA training / inference runtimeは本成果物では固定しない。
+## 9. 制約
 
-## 15. 保守方針
+- 同期は同一host monotonic clockを基準とするsoftware-level alignmentであり、hardware triggerやsub-millisecond synchronizationを保証しない
+- GelSight 2台同時captureのUSB / CPU / storage capacityは未検証
+- MMS101のforce ground truth / calibration accuracyは本validationの対象外
+- sensor-specific driverの他hardware / firmware / OSでの互換性は保証しない
+- policyへsensor historyをどうencodeするかはtask / model architectureに依存する
+- VLA training / inference performanceは本reportの実機validation範囲外
 
-Trossen / LeRobot / hardware / Dataset schemaを変更した場合は `docs/05_maintenance.md` に従ってacceptance pathを再実行する。
+---
 
-robot frame timestamp referenceはLeRobot 0.6.0のrecord loopに依存するため、upstream更新時にはsource diffと再validationを行う。
+## 10. 保守方針
+
+本成果物は検証済みupstream revisionを固定する。
+
+Trossen / LeRobot / hardware / Dataset schemaを変更した場合は`docs/05_maintenance.md`に従って関連acceptance pathを再実行する。特に`record_with_timestamps.py`はLeRobot 0.6.0のrecord loop実装に依存するため、upstream更新時にはsource diffと再validationを行う。
+
+External sensorを変更する場合はsensor名ではなくinterface contractを再確認する。
+
+```text
+data format
+actual rate
+source/device timestamp semantics
+host monotonic timestamp
+causal alignment
+missing / age distribution
+```
+
+---
+
+## 11. 納品時の最終確認
+
+Hardwareを必要とするbaseline / Pattern B / Pattern C validationは完了した。
+
+Final document revisionをcommitした後、最終repository treeに対して以下を行う。
+
+```text
+git diff --check
+Markdown relative link check
+machine-specific identifier scan
+personal/staging repository URL scan
+generated/runtime/data artifact exclusion check
+fresh clone / setup static path check
+```
+
+Final commitとrelease check結果は`docs/06_validation_results.md`のDelivery acceptance statusへ記録する。

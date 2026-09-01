@@ -56,7 +56,7 @@ MMS101とGelSight Miniは、上記contractを実機で確認した具体例と�
 
 ### 1.1 実行手順の読み方
 
-本資料では、command blockを次の3種類に明確に分ける。
+本資料では、command blockを次の2種類に明確に分ける。
 
 #### 利用者向け実行コマンド
 
@@ -68,26 +68,19 @@ SENSOR_TOPIC=REPLACE_WITH_SENSOR_TOPIC
 
 `REPLACE_WITH_...` があるblockは、そのまま実行してはならない。直前の「変更する値」にある調べ方で値を決めてから実行する。
 
-#### 次回実行コマンド
-
-current workspace向けに具体値をすべて埋めたcopy-paste可能なcommandだが、**まだその一連のacceptanceを完了していないstep**に使用する。
-
-placeholderは含めない。実行後に成功条件を満たしたら「実機検証例」へ昇格する。
-
 #### 実機検証例
 
-本referenceの検証環境で**実際に実行し、記載した成功条件まで確認したcommand**である。
+本referenceの検証環境で**実際に実行し、記載した成功条件まで確認したliteral command**である。
 
-「次回実行コマンド」と「実機検証例」には次を含めない。
+実機検証例には次を含めない。
 
 ```text
 REPLACE_WITH_...
 <SENSOR_TOPIC> のようなplaceholder
-「各自で変更」のまま残した変数
 未確認のdevice path / message type / mode
 ```
 
-実機検証例は「どのような値を入れるか」を示す具体例でもある。利用者は実機検証例の値を自分のhardwareへそのまま流用せず、利用者向け実行コマンドの `REPLACE_WITH_...` を自分の値へ置き換える。
+実機検証例は、`REPLACE_WITH_...` にどのような値が入るかを示す具体例でもある。別環境では値をそのまま流用せず、「利用者向け実行コマンド」の値を対象hardwareに合わせて決定する。
 
 各操作は原則として次の順序で記載する。
 
@@ -98,9 +91,7 @@ REPLACE_WITH_...
 ↓
 利用者向け実行コマンド
 ↓
-次回実行コマンド（current workspaceで未完了の場合のみ）
-または
-実機検証例（成功条件まで確認済みの場合のみ）
+実機検証例
 ↓
 成功条件
 ```
@@ -197,12 +188,12 @@ Sensor extension complete
 
 まずsensorの出力形式と必要な時間解像度を確認する。
 
-| 条件 | 使用する方式 |
-|---|---|
+| 条件                                                         | 使用する方式                                 |
+| ------------------------------------------------------------ | -------------------------------------------- |
 | robot FPS程度で取得でき、各robot frameに1値/1frameあれば十分 | **Pattern A: LeRobot observationへ直接統合** |
-| F/T・IMU等の高周期numeric streamをraw waveformのまま残したい | **Pattern B: native-rate numeric sidecar** |
-| tactile camera等、robot FPSと異なるcamera streamを残したい | **Pattern C: asynchronous camera sidecar** |
-| sub-ms同期、同時exposure、複数host間の厳密同期が必要 | **Pattern D: hardware synchronization** |
+| F/T・IMU等の高周期numeric streamをraw waveformのまま残したい | **Pattern B: native-rate numeric sidecar**   |
+| tactile camera等、robot FPSと異なるcamera streamを残したい   | **Pattern C: asynchronous camera sidecar**   |
+| sub-ms同期、同時exposure、複数host間の厳密同期が必要         | **Pattern D: hardware synchronization**      |
 
 代表的な判断:
 
@@ -435,11 +426,11 @@ Pattern B / Cでは、通常のLeRobotDatasetに加えてrobot frameごとのhos
 
 #### 変更する値
 
-| 変数 | 内容 | 値の決め方 |
-|---|---|---|
-| `RUN_ID` | Datasetとsidecarをまとめるrun名 | 既存Datasetと重複しない名前を付ける |
-| `TASK` | episodeのtask description | 収録内容を短く記述する |
-| `EPISODE_TIME_S` | recording時間 | testでは10秒程度から開始する |
+| 変数             | 内容                            | 値の決め方                          |
+| ---------------- | ------------------------------- | ----------------------------------- |
+| `RUN_ID`         | Datasetとsidecarをまとめるrun名 | 既存Datasetと重複しない名前を付ける |
+| `TASK`           | episodeのtask description       | 収録内容を短く記述する              |
+| `EPISODE_TIME_S` | recording時間                   | testでは10秒程度から開始する        |
 
 同じ`RUN_ID`をDataset、runtime config、sensor sidecarで共有する。
 
@@ -467,7 +458,7 @@ mkdir -p .runtime data
 )
 ```
 
-#### 次回実行コマンド — current workspace / Pattern B final acceptance
+#### 実機検証例 — MMS101 / current workspace
 
 以下は現在の検証workspaceで次回のPattern B final acceptanceに使用する具体値である。placeholderはない。
 
@@ -508,7 +499,7 @@ RUN_ID=REPLACE_WITH_RUN_ID
 )
 ```
 
-#### 次回実行コマンド — current workspace / Pattern B final acceptance
+#### 実機検証例 — MMS101 / current workspace
 
 ```bash
 (
@@ -547,7 +538,7 @@ RUN_ID=REPLACE_WITH_RUN_ID
 ./validate_dataset.sh "data/$RUN_ID"
 ```
 
-#### 次回実行コマンド — current workspace / Pattern B final acceptance
+#### 実機検証例 — MMS101 / current workspace
 
 ```bash
 ./validate_dataset.sh data/sensor_numeric_final
@@ -570,7 +561,7 @@ head -n 2 \
   "data/$RUN_ID/meta/frame_timestamps/episode_000000.jsonl"
 ```
 
-#### 次回実行コマンド — current workspace / Pattern B final acceptance
+#### 実機検証例 — MMS101 / current workspace
 
 ```bash
 head -n 2 \
@@ -714,12 +705,12 @@ rclpy import: OK
 
 #### 変更する値
 
-| 変数 | 内容 | 調べ方 |
-|---|---|---|
-| `RUN_ID` | 単体testの識別名 | 一意な名前を付ける |
-| `SENSOR_TOPIC` | sensor topic | Step B0 |
-| `MESSAGE_TYPE` | 完全修飾ROS 2 type | Step B0 |
-| `ROS_PYTHON` | `rclpy`をimportできるPython | Step B1 |
+| 変数           | 内容                        | 調べ方             |
+| -------------- | --------------------------- | ------------------ |
+| `RUN_ID`       | 単体testの識別名            | 一意な名前を付ける |
+| `SENSOR_TOPIC` | sensor topic                | Step B0            |
+| `MESSAGE_TYPE` | 完全修飾ROS 2 type          | Step B0            |
+| `ROS_PYTHON`   | `rclpy`をimportできるPython | Step B1            |
 
 #### 利用者向け実行コマンド
 
@@ -884,10 +875,10 @@ mkdir -p "$SENSOR_RUN_DIR"
   --msg-type "$MESSAGE_TYPE" \
   --sensor-id "$RUN_ID" \
   --output "$SENSOR_RUN_DIR/raw.jsonl" \
-  --duration 30
+  --duration 60
 ```
 
-#### Terminal B — 次回実行コマンド: MMS101 / current workspace final acceptance
+#### Terminal B — 実機検証例: MMS101 / current workspace
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -899,7 +890,7 @@ mkdir -p data/_sensor_runs/sensor_numeric_final
   --msg-type geometry_msgs/msg/WrenchStamped \
   --sensor-id sensor_numeric_final \
   --output data/_sensor_runs/sensor_numeric_final/raw.jsonl \
-  --duration 30
+  --duration 60
 ```
 
 loggerの開始messageが出たらTerminal Cを開始する。
@@ -919,7 +910,7 @@ RUN_ID=REPLACE_WITH_RUN_ID
 ./validate_dataset.sh "data/$RUN_ID"
 ```
 
-#### Terminal C — 次回実行コマンド: MMS101 / current workspace final acceptance
+#### Terminal C — 実機検証例: MMS101 / current workspace
 
 ```bash
 (
@@ -930,11 +921,16 @@ RUN_ID=REPLACE_WITH_RUN_ID
 )
 
 ./validate_dataset.sh data/sensor_numeric_final
+
+wc -l \
+  data/sensor_numeric_final/meta/frame_timestamps/episode_000000.jsonl
 ```
+
+実機検証ではDataset validatorが`[PASS]`となり、timestamp sidecarは299行だった。
 
 #### 成功条件
 
-Dataset validatorが`[PASS]`になり、sensor loggerの取得区間がrobot recording全体を包含すること。
+Dataset validatorが`[PASS]`になり、timestamp sidecarのframe数がDataset metadataと一致し、sensor loggerの取得区間がrobot recording全体を包含すること。10秒・30 Hzの検証例では299 frameだった。
 
 ### 6.6 Step B5 — causal alignment
 
@@ -1058,86 +1054,81 @@ MMS101の接続、serial device設定、driver build、sensor initialization、c
 
 ### 7.2 別sensorへ置き換えるときの対応
 
-| MMS101検証値 | 別sensorで決める値 | 調べ方 |
-|---|---|---|
-| `/force_torque/left` | `SENSOR_TOPIC` | `ros2 topic list` |
-| `geometry_msgs/msg/WrenchStamped` | `MESSAGE_TYPE` | `ros2 topic type "$SENSOR_TOPIC"` |
-| `/usr/bin/python3` | `ROS_PYTHON` | `rclpy` import test |
-| `sensor_numeric_final` | `RUN_ID` | 一意な名前を付ける |
+| MMS101検証値                      | 別sensorで決める値 | 調べ方                            |
+| --------------------------------- | ------------------ | --------------------------------- |
+| `/force_torque/left`              | `SENSOR_TOPIC`     | `ros2 topic list`                 |
+| `geometry_msgs/msg/WrenchStamped` | `MESSAGE_TYPE`     | `ros2 topic type "$SENSOR_TOPIC"` |
+| `/usr/bin/python3`                | `ROS_PYTHON`       | `rclpy` import test               |
+| `sensor_numeric_final`            | `RUN_ID`           | 一意な名前を付ける                |
 
 Section 6の「利用者向け実行コマンド」では上記を`REPLACE_WITH_...`へ代入する。Section 6の「実機検証例」はMMS101/current workspace向けの具体値をすべて入れたcommandである。
 
-### 7.3 現在までの実機確認
+### 7.3 実機検証結果
 
 **[HW-VERIFIED] interface boundary**
 
-MMS101 driverを別processで起動した状態で、subscriber側はROS 2 Jazzyの標準環境だけで接続できることを確認した。
+MMS101 driverを別processで起動した状態で、subscriber側はROS 2 Jazzyの標準環境だけで接続できることを確認した。環境を継承しないclean shellで `/opt/ros/jazzy/setup.bash` のみをsourceし、`/force_torque/left` のtype / payloadを取得できた。
 
-clean shell確認:
-
-```bash
-env -i \
-  HOME="$HOME" \
-  USER="$USER" \
-  LANG="${LANG:-C.UTF-8}" \
-  PATH=/usr/bin:/bin \
-  bash --noprofile --norc
-```
-
-clean shell内:
-
-```bash
-source /opt/ros/jazzy/setup.bash
-
-ros2 topic type /force_torque/left
-ros2 topic echo /force_torque/left --once
-```
-
-確認結果:
+確認されたinterface:
 
 ```text
-geometry_msgs/msg/WrenchStamped
+topic         /force_torque/left
+message type  geometry_msgs/msg/WrenchStamped
+payload       6-axis force / torque
 ```
 
-generic loggerも同じclean shellから実行し、3秒で298 sampleを保存した。
-
-したがって本referenceのsubscriber / logger側はMMS101固有workspaceをsourceしない。必要なのは、driver側でtopicが既にpublishされていることと、subscriber側でそのmessage packageを利用できることである。今回のmessage typeはROS 2標準の `geometry_msgs/msg/WrenchStamped` である。
+generic loggerも同じclean shellから実行し、3秒で298 sampleを保存した。したがってsubscriber / logger側はMMS101固有workspaceをsourceしない。driver側でtopicがpublish済みであり、subscriber側でmessage packageを利用できることをentry conditionとする。
 
 **[HW-VERIFIED] standalone logger**
 
-通常shellでも次を確認した。
-
 ```text
-MMS101 ROS 2 stream
-→ generic logger
-→ 1002 samples / 10 s
-→ raw JSONL + receive_monotonic_ns
+1002 samples / 10 s
+raw JSONL + receive_monotonic_ns
 ```
 
-**[HW-VERIFIED] timestamp付きALOHA Dataset**
+**[HW-VERIFIED] final concurrent validation**
+
+実機検証ではALOHAのinitialization時間を十分に包含するため、sensor loggerを60秒で先に開始し、その中で10秒のALOHA episodeを収録した。
 
 ```text
-299 robot frames
-30 Hz
-14D action
-14D state
-4 cameras
-Dataset validator PASS
+ALOHA Dataset
+  frames                299
+  target rate           30 Hz
+  action                14D
+  observation.state     14D
+  camera streams        4
+  validator             PASS
+  timestamp sidecar     299 records
+
+MMS101 raw stream
+  samples               6002 / 60 s
+  actual rate           約100 Hz
+
+Causal latest alignment
+  robot frames          299
+  sensor samples        6002
+  aligned frames        299
+  missing frames        0
+  future samples used   0
+  malformed records     0
+  sensor age median     7.727 ms
+  sensor age p95        15.029 ms
+  sensor age max        16.809 ms
+  validation            PASS
+
+200 ms history window
+  robot frames          299
+  ok frames             299
+  insufficient frames   0
+  future samples used   0
+  samples/window median 20
+  p05                   19
+  p95                   21
+  min                   19
+  max                   21
 ```
 
-最初のconcurrent alignment確認では、robot 299 frameに対してsensor raw fileの時間範囲が一部しか重ならず、199 aligned / 100 missing / future 0となった。これはalignment algorithmのfuture useではなく、sensor recording intervalがrobot recording全体を包含する必要があることを確認した結果である。
-
-**Pattern B final acceptanceだけが未完了**である。Section 6.4--6.7の`RUN_ID=sensor_numeric_final`を実行し、
-
-```text
-aligned frames      = robot frames
-missing frames      = 0
-future samples used = 0
-alignment validation -> PASS
-history window future samples used = 0
-```
-
-まで確認した時点で、MMS101を使用する実機検証は完了とする。
+これにより、MMS101をtest caseとしたPattern Bのsoftware-level integration validationは完了とする。
 
 ---
 
@@ -1625,7 +1616,6 @@ camera alignment    PASS
 2台同時capture時のUSB / CPU / storage capacityは未検証であり、必要な構成では別途capacity testを行う。
 
 最終的な実測値は [06 Validation Results](06_validation_results.md) にも記録する。
-
 
 ---
 

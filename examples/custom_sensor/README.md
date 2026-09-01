@@ -1,27 +1,41 @@
-# Custom Sensor Reference
+# Custom Sensor Script Reference
 
-このdirectoryは、ALOHA標準recordingとは取得周期やinterfaceが異なる外部sensorを扱うためのreference implementationをまとめる。
+このdirectoryは、[03 Architecture and Sensor Extension](../../docs/03_architecture_and_extension.md) で使用するreference scriptを提供する。
 
-sensor integration方式の選択、raw data、timestamp、software / hardware synchronizationの設計は [docs/03_architecture_and_extension.md](../../docs/03_architecture_and_extension.md) を参照する。本資料では各scriptの実行方法、入力、出力を扱う。
+**新しいsensorを追加するときの実行順序は03を参照する。**  
+本資料はscriptごとのCLI、input、outputを確認するときに使用する。
 
-基本方針:
+## 1. Script map
+
+| Script | Purpose | Main input | Main output |
+|---|---|---|---|
+| `record_with_timestamps.py` | LeRobot recordingへhost timestamp sidecarを追加 | LeRobot runtime YAML | Dataset + `meta/frame_timestamps/*.jsonl` |
+| `ros2_timeseries_logger.py` | ROS 2 numeric streamをnative/actual rateで保存 | ROS 2 topic | raw JSONL + metadata |
+| `align_timeseries.py` | robot frameへcausal latest numeric sampleを対応付け | robot timestamp + sensor JSONL | alignment JSONL + summary |
+| `validate_alignment.py` | numeric alignmentのcausality / completenessを検証 | alignment JSONL | PASS / FAIL + age統計 |
+| `build_sensor_windows.py` | `(t-W, t]` のhistory-window manifestを生成 | robot timestamp + sensor JSONL | window JSONL + summary |
+| `camera/extract_mkv_timestamps.py` | MKV packet PTSをJSONLへexport | MKV | camera timestamp JSONL |
+| `camera/align_camera_frames.py` | robot frameへcausal latest camera frameを対応付け | robot + camera timestamps | camera alignment JSONL |
+
+camera device discoveryとFFmpeg capture optionは [camera/README.md](camera/README.md) を参照する。
+
+---
+
+## 2. `record_with_timestamps.py`
+
+### Purpose
+
+LeRobot 0.6.0のrecord loopへ実行時patchを適用し、通常のDataset frameごとにhost monotonic timestampをsidecarへ保存する。
+
+representative robot time:
 
 ```text
-sensor acquisition rate != robot/control rate != policy rate
-
-raw data + timestamp              = canonical
-policy-specific synchronized view = derived
+observation_end_monotonic_ns
 ```
 
-## 1. Robot frame timestamp sidecar
+### Runtime configの生成例
 
-`record_with_timestamps.py` はLeRobot 0.6.0のrecording loopへ実行時patchを適用し、各Dataset frameについてhost monotonic clockによるtimestamp sidecarを追加する。
-
-代表robot時刻には `observation_end_monotonic_ns` を使用する。
-
-### 1.1 timestamp付きrecording configを生成
-
-repository rootで、baselineのhardware identityとrecording templateからruntime configを生成する。
+repository root:
 
 ```bash
 mkdir -p .runtime data
@@ -41,7 +55,7 @@ mkdir -p .runtime data
 )
 ```
 
-### 1.2 recording
+### Run
 
 ```bash
 (
@@ -52,131 +66,304 @@ mkdir -p .runtime data
 )
 ```
 
-Dataset rootに以下が追加される。
+### Output
 
 ```text
 data/sensor_reference/meta/frame_timestamps/
-  episode_000000.jsonl
-  episode_000000.meta.json
+├── episode_000000.jsonl
+└── episode_000000.meta.json
 ```
 
-`record_with_timestamps.py` はLeRobot 0.6.0のrecording implementationに依存する。LeRobot更新時は [05 Maintenance](../../docs/05_maintenance.md) に従って再確認する。
+JSONLには以下を含む。
 
-## 2. High-rate numeric / time-series sensor
+```text
+episode_index
+frame_index
+dataset_timestamp_s
+loop_start_monotonic_ns
+observation_start_monotonic_ns
+observation_end_monotonic_ns
+observation_end_wall_ns
+action_sent_monotonic_ns
+frame_added_monotonic_ns
+observation_duration_ns
+```
 
-ROS 2 topicとして提供される数値sensorは `ros2_timeseries_logger.py` でnative / actual rateのままJSONLへ保存する。
+---
 
-対象PCでROS 2と対象message packageをsourceしたshellから実行する。
+## 3. `ros2_timeseries_logger.py`
+
+### Purpose
+
+任意のROS 2 numeric messageをflattenし、callback entry時のhost monotonic timestampとともにJSONLへ保存する。
+
+### Prerequisites
+
+実行shellで次が使用できること。
+
+```bash
+ros2 topic list
+python3 -c "import rclpy; import rosidl_runtime_py"
+```
+
+対象message packageも同じenvironmentからimport可能である必要がある。
+
+### Run
 
 ```bash
 python3 examples/custom_sensor/ros2_timeseries_logger.py \
-  --topic /force_torque/left \
-  --msg-type geometry_msgs/msg/WrenchStamped \
-  --sensor-id example_ft \
-  --output /tmp/example_ft.jsonl \
-  --duration 60
+  --topic <TOPIC> \
+  --msg-type <PACKAGE/msg/TYPE> \
+  --sensor-id <SENSOR_ID> \
+  --output <RAW_JSONL> \
+  --duration 10
 ```
 
-各sample:
-
-- `sample_index`
-- `source_timestamp_ns`（messageにtimestampがある場合）
-- `receive_monotonic_ns`
-- host wall clock
-- numeric values
-
-同一hostでの標準alignmentには `receive_monotonic_ns` を使用する。
-
-### 2.1 Current-value view
-
-各robot frameに対して、
+主なoption:
 
 ```text
-sensor_time <= robot_observation_time
+--topic              required
+--msg-type           required
+--sensor-id          default: external_sensor
+--output             required
+--duration           0 = Ctrl+Cまで継続
+--qos-reliability    best_effort | reliable
+--flush-interval     default: 0.5 s
+```
+
+### Output
+
+`<RAW_JSONL>`:
+
+```json
+{
+  "sample_index": 0,
+  "sensor_id": "example",
+  "source_timestamp_ns": 0,
+  "receive_wall_ns": 0,
+  "receive_monotonic_ns": 0,
+  "elapsed_s": 0.0,
+  "values": {}
+}
+```
+
+`<RAW_JSONL>.meta.json`:
+
+```text
+topic
+msg_type
+sensor_id
+receive clock
+wall clock
+QoS reliability
+```
+
+`header.stamp` が存在するmessageでは `source_timestamp_ns` として保存する。
+
+---
+
+## 4. `align_timeseries.py`
+
+### Purpose
+
+各robot frame時刻 `t_robot` に対して、
+
+```text
+sensor_time <= t_robot
 ```
 
 を満たす最新sampleを選択する。
 
+### Run
+
 ```bash
 python3 examples/custom_sensor/align_timeseries.py \
-  --robot-frames data/sensor_reference/meta/frame_timestamps/episode_000000.jsonl \
-  --sensor /tmp/example_ft.jsonl \
-  --output /tmp/aligned_ft.jsonl
+  --robot-frames <ROBOT_TIMESTAMP_JSONL> \
+  --sensor <RAW_SENSOR_JSONL> \
+  --output <ALIGNMENT_JSONL>
+```
 
+optional:
+
+```text
+--robot-time-field    default: observation_end_monotonic_ns
+--sensor-time-field   default: receive_monotonic_ns
+--max-age-ms          古すぎるsampleをmissingとして扱うthreshold
+```
+
+### Output summary
+
+```text
+robot frames
+sensor samples
+aligned frames
+missing frames
+future samples used
+sensor age median
+sensor age p95
+sensor age max
+```
+
+`<ALIGNMENT_JSONL>.summary.json` も生成する。
+
+---
+
+## 5. `validate_alignment.py`
+
+### Run
+
+```bash
 python3 examples/custom_sensor/validate_alignment.py \
-  /tmp/aligned_ft.jsonl \
+  <ALIGNMENT_JSONL>
+```
+
+smoke testで全robot frameにsampleを要求する場合:
+
+```bash
+python3 examples/custom_sensor/validate_alignment.py \
+  <ALIGNMENT_JSONL> \
   --require-complete
 ```
 
-確認項目:
+optional:
+
+```text
+--max-p95-age-ms <MS>
+```
+
+PASS条件:
 
 - future sample = 0
-- missing
-- timestamp ordering
-- sensor age
+- malformed record = 0
+- `--require-complete` 使用時はmissing = 0
+- `--max-p95-age-ms` 指定時はthreshold以内
 
-### 2.2 History-window view
+---
 
-robot frame時刻 `t` に対して `(t-W, t]` のraw sample範囲を生成する。
+## 6. `build_sensor_windows.py`
+
+### Purpose
+
+各robot frame時刻 `t` に対して、
+
+```text
+(t - window, t]
+```
+
+のsensor sample範囲を生成する。
+
+raw valueは複製せず、sample index / timestamp rangeをmanifestへ保存する。
+
+### Run
 
 ```bash
 python3 examples/custom_sensor/build_sensor_windows.py \
-  --robot-frames data/sensor_reference/meta/frame_timestamps/episode_000000.jsonl \
-  --sensor /tmp/example_ft.jsonl \
-  --output /tmp/ft_windows.jsonl \
+  --robot-frames <ROBOT_TIMESTAMP_JSONL> \
+  --sensor <RAW_SENSOR_JSONL> \
+  --output <WINDOW_JSONL> \
   --window-ms 200
 ```
 
-outputはraw sample index / timestamp範囲を保持する。
-
-## 3. Asynchronous camera
-
-GelSight等、実効camera rateがrobot recording rateと一致しないcameraは [camera/README.md](camera/README.md) を使用する。
-
-reference path:
+optional:
 
 ```text
-native compressed capture
-    ↓
-video + frame/packet timestamp
-    ↓
-timestamp export
-    ↓
-causal latest-frame alignment
+--min-samples <N>
+--robot-time-field <FIELD>
+--sensor-time-field <FIELD>
 ```
 
-camera timestamp extraction:
+output summary:
 
 ```text
-camera/extract_mkv_timestamps.py
+robot frames
+sensor samples
+window
+ok frames
+insufficient frames
+future samples used
+samples/window median / p05 / p95 / min / max
 ```
 
-robot frameへの対応付け:
+---
+
+## 7. Camera scripts
+
+### `camera/extract_mkv_timestamps.py`
+
+```bash
+python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
+  <VIDEO_MKV> \
+  --output <CAMERA_TIMESTAMP_JSONL>
+```
+
+前提:
+
+- V4L2 capture
+- FFmpeg `-copyts`
+- `-timestamps default`
+- stream copy (`-c:v copy`)
+
+output:
 
 ```text
-camera/align_camera_frames.py
+frame_index
+pts_time_s
+receive_monotonic_ns
+timestamp_source
+video
+video_frame_index
 ```
 
-## 4. 新しいsensorへ流用する場合
+### `camera/align_camera_frames.py`
 
-adapterは次の情報を出力する。
+```bash
+python3 examples/custom_sensor/camera/align_camera_frames.py \
+  --robot-frames <ROBOT_TIMESTAMP_JSONL> \
+  --camera-timestamps <CAMERA_TIMESTAMP_JSONL> \
+  --output <CAMERA_ALIGNMENT_JSONL>
+```
+
+optional:
 
 ```text
-[ ] raw data
-[ ] sample/frame index
-[ ] source timestamp（取得可能な場合）
-[ ] host monotonic timestamp
-[ ] sensor/config metadata
+--max-age-ms <MS>
 ```
 
-実装後、[docs/03_architecture_and_extension.md](../../docs/03_architecture_and_extension.md) のvalidation checklistに従ってactual rate、timestamp、concurrent acquisition、causal alignmentを確認する。
+summary:
 
-## 5. Policy / VLAへ渡すとき
+```text
+robot frames
+camera frames
+aligned frames
+missing frames
+future frames used
+reused assignments
+camera age median / p95 / max
+```
 
-policy-specific representationはcanonical rawから生成する。
+---
 
-- current value: causal latest sample/frame
-- history window: 一定時間のraw sample群
-- fast/slow構成: 高周期local controllerで処理したsummaryを低速policyへ渡す
+## 8. End-to-end procedure
 
-具体的なrepresentationはpolicy architectureに合わせて決定する。
+scriptを個別に試すだけではsensor extensionのacceptanceにはならない。
+
+次のどちらかを [03 Architecture and Sensor Extension](../../docs/03_architecture_and_extension.md) に従って通す。
+
+```text
+High-rate numeric:
+driver
+-> stream inspection
+-> raw logger
+-> timestamped ALOHA recording
+-> align_timeseries
+-> validate_alignment
+-> build_sensor_windows
+
+Asynchronous camera:
+device discovery
+-> format inspection
+-> native capture
+-> timestamped ALOHA recording
+-> extract_mkv_timestamps
+-> align_camera_frames
+```

@@ -4,7 +4,7 @@
 
 本書は、本reference作成で行った**調査、選定、実装、実機検証、制約**を納品・レビュー向けに要約する。
 
-利用者向けの操作マニュアルは `docs/02_data_collection.md`、sensor extension設計は `docs/03_architecture_and_extension.md`、実機検証結果は `docs/06_validation_results.md` を参照する。
+baselineの操作マニュアルは `docs/02_data_collection.md`、sensor extensionのend-to-end操作・設計マニュアルは `docs/03_architecture_and_extension.md`、各sensor reference scriptのCLI仕様は `examples/custom_sensor/README.md`、実機検証結果は `docs/06_validation_results.md` を参照する。
 
 ## 2. 目的
 
@@ -162,7 +162,7 @@ robot FPSと異なるcameraをnative compressed streamで保存し、frame/packe
 
 software timestampで不足するtaskではhardware trigger、共有clock、PTP等を対象hardwareに合わせて設計する。
 
-詳細は `docs/03_architecture_and_extension.md` に記載する。
+共通の実行フロー、方式選択、MMS101 / GelSight Miniの実機検証例は `docs/03_architecture_and_extension.md` に記載する。
 
 ## 10. External sensor reference implementation
 
@@ -174,7 +174,7 @@ software timestampで不足するtaskではhardware trigger、共有clock、PTP�
 - `extract_mkv_timestamps.py`: asynchronous camera packet timestamp export
 - `align_camera_frames.py`: causal latest-frame alignment
 
-実行方法は `examples/custom_sensor/README.md` に記載する。
+`examples/custom_sensor/README.md` には各scriptのCLI / input / output仕様を記載し、実行順序は `docs/03_architecture_and_extension.md` に一本化する。
 
 ## 11. Sensor architecture validation
 

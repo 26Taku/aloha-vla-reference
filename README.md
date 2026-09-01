@@ -11,7 +11,7 @@ Trossen Robotics公式 `lerobot_trossen` をbaselineとして、環境構築、h
 - **ALOHAを初めてセットアップしてDatasetを収録したい**  
   → [docs/02_data_collection.md](docs/02_data_collection.md) を上から順に実行する
 - **camera / F/T / tactile等のsensorを追加したい**  
-  → baselineを一度動作確認した後、[docs/03_architecture_and_extension.md](docs/03_architecture_and_extension.md) のdecision guideから方式を選ぶ
+  → baselineを一度動作確認した後、[docs/03_architecture_and_extension.md](docs/03_architecture_and_extension.md) を上から実行する
 
 通常の初回利用フロー:
 
@@ -58,7 +58,7 @@ Dataset validation
 - current-value / history-window等のderived representation
 - software synchronizationとhardware synchronizationの境界
 
-設計判断は [03 Architecture and Extension](docs/03_architecture_and_extension.md)、reference codeの実行方法は [examples/custom_sensor/README.md](examples/custom_sensor/README.md) を参照してください。
+sensor追加のend-to-end手順は [03 Architecture and Extension](docs/03_architecture_and_extension.md)、各reference scriptのCLI / input / output仕様は [examples/custom_sensor/README.md](examples/custom_sensor/README.md) を参照してください。
 
 外部sensorを使用しない場合は、baseline data collectionだけで完結します。
 
@@ -67,8 +67,8 @@ Dataset validation
 | 読みたい内容 | 資料 | 役割 |
 |---|---|---|
 | 初回セットアップから収録完了まで進めたい | [02 Data Collection](docs/02_data_collection.md) | **baselineの唯一の詳細操作マニュアル** |
-| camera / F/T / tactile等を追加したい | [03 Architecture and Extension](docs/03_architecture_and_extension.md) | **sensor extensionの唯一の設計ガイド** |
-| sensor reference codeを実行したい | [Custom Sensor Reference](examples/custom_sensor/README.md) | scriptの入力・出力・CLI |
+| camera / F/T / tactile等を追加したい | [03 Architecture and Extension](docs/03_architecture_and_extension.md) | **sensor extensionのend-to-end操作・設計マニュアル** |
+| sensor reference scriptのoptionや入出力を確認したい | [Custom Sensor Script Reference](examples/custom_sensor/README.md) | scriptのCLI / input / output仕様 |
 | なぜこのsoftware stackを採用したか知りたい | [01 Reference Stack](docs/01_reference_stack.md) | baselineの選定理由・固定version・代替構成 |
 | 実行中の問題を切り分けたい | [04 Troubleshooting](docs/04_troubleshooting.md) | 症状別の確認項目と安全な復旧 |
 | hardware / LeRobot / Trossenを更新したい | [05 Maintenance](docs/05_maintenance.md) | 更新時の変更箇所・再検証条件・public化方針 |

@@ -1,7 +1,5 @@
 robot:
   type: bi_widowxai_follower_robot
-  left_arm_ip_address: "REPLACE_WITH_LEFT_FOLLOWER_IP"
-  right_arm_ip_address: "REPLACE_WITH_RIGHT_FOLLOWER_IP"
   id: bimanual_follower
 
   left_arm_max_relative_target: null
@@ -16,36 +14,30 @@ robot:
   cameras:
     cam_high:
       type: intelrealsense
-      serial_number_or_name: "REPLACE_WITH_CAM_HIGH_SERIAL"
       width: 424
       height: 240
       fps: 30
 
     cam_low:
       type: intelrealsense
-      serial_number_or_name: "REPLACE_WITH_CAM_LOW_SERIAL"
       width: 424
       height: 240
       fps: 30
 
     cam_left_wrist:
       type: intelrealsense
-      serial_number_or_name: "REPLACE_WITH_LEFT_WRIST_SERIAL"
       width: 424
       height: 240
       fps: 30
 
     cam_right_wrist:
       type: intelrealsense
-      serial_number_or_name: "REPLACE_WITH_RIGHT_WRIST_SERIAL"
       width: 424
       height: 240
       fps: 30
 
 teleop:
   type: bi_widowxai_leader_teleop
-  left_arm_ip_address: "REPLACE_WITH_LEFT_LEADER_IP"
-  right_arm_ip_address: "REPLACE_WITH_RIGHT_LEADER_IP"
   id: bimanual_leader
 
 dataset:

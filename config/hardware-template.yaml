@@ -1,0 +1,17 @@
+# Machine-specific hardware identity.
+# Copy this file to config/hardware-local.yaml and edit only the local copy.
+#
+# Numeric-only camera serials may be written with or without quotes.
+# Runtime configuration generation normalizes all identifiers to strings.
+
+arms:
+  follower_left_ip: REPLACE_WITH_FOLLOWER_LEFT_IP
+  follower_right_ip: REPLACE_WITH_FOLLOWER_RIGHT_IP
+  leader_left_ip: REPLACE_WITH_LEADER_LEFT_IP
+  leader_right_ip: REPLACE_WITH_LEADER_RIGHT_IP
+
+cameras:
+  cam_high: REPLACE_WITH_CAM_HIGH_SERIAL
+  cam_low: REPLACE_WITH_CAM_LOW_SERIAL
+  cam_left_wrist: REPLACE_WITH_LEFT_WRIST_SERIAL
+  cam_right_wrist: REPLACE_WITH_RIGHT_WRIST_SERIAL

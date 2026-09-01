@@ -28,3 +28,4 @@ logs/
 # Machine-specific hardware configuration (created from tracked templates)
 config/teleop-local.yaml
 config/record-local.yaml
+config/hardware-local.yaml

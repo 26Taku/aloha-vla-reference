@@ -54,6 +54,57 @@ MMS101とGelSight Miniは、上記contractを実機で確認した具体例と�
 
 `examples/custom_sensor/README.md` は各reference scriptのCLI / input / output仕様をまとめる。camera captureのFFmpeg option等の詳細は `examples/custom_sensor/camera/README.md` を参照する。実測結果は [06 Validation Results](06_validation_results.md) に記録する。
 
+### 1.1 実行手順の読み方
+
+本資料では、command blockを次の3種類に明確に分ける。
+
+#### 利用者向け実行コマンド
+
+利用者が自分の環境へ合わせて実行するtemplateである。変更が必要な値には必ず `REPLACE_WITH_...` を使用する。
+
+```bash
+SENSOR_TOPIC=REPLACE_WITH_SENSOR_TOPIC
+```
+
+`REPLACE_WITH_...` があるblockは、そのまま実行してはならない。直前の「変更する値」にある調べ方で値を決めてから実行する。
+
+#### 次回実行コマンド
+
+current workspace向けに具体値をすべて埋めたcopy-paste可能なcommandだが、**まだその一連のacceptanceを完了していないstep**に使用する。
+
+placeholderは含めない。実行後に成功条件を満たしたら「実機検証例」へ昇格する。
+
+#### 実機検証例
+
+本referenceの検証環境で**実際に実行し、記載した成功条件まで確認したcommand**である。
+
+「次回実行コマンド」と「実機検証例」には次を含めない。
+
+```text
+REPLACE_WITH_...
+<SENSOR_TOPIC> のようなplaceholder
+「各自で変更」のまま残した変数
+未確認のdevice path / message type / mode
+```
+
+実機検証例は「どのような値を入れるか」を示す具体例でもある。利用者は実機検証例の値を自分のhardwareへそのまま流用せず、利用者向け実行コマンドの `REPLACE_WITH_...` を自分の値へ置き換える。
+
+各操作は原則として次の順序で記載する。
+
+```text
+目的
+↓
+変更する値
+↓
+利用者向け実行コマンド
+↓
+次回実行コマンド（current workspaceで未完了の場合のみ）
+または
+実機検証例（成功条件まで確認済みの場合のみ）
+↓
+成功条件
+```
+
 確認状態:
 
 - **[HW-VERIFIED]**: 実機で確認済み
@@ -358,23 +409,47 @@ source/device timestampが得られる場合も保存するが、そのclock dom
 
 Pattern B / Cでは、通常のLeRobotDatasetに加えてrobot frameごとのhost timestampを保存する。
 
-### 5.1 前提確認
+### 5.1 Baseline状態を確認
 
-repository rootで:
+#### 利用者向け実行コマンド
 
 ```bash
 ./check_hardware.sh
 ```
 
-`[READY]` を確認する。
+#### 実機検証例
+
+```bash
+./check_hardware.sh
+```
+
+#### 成功条件
+
+```text
+[READY]
+```
 
 通常のteleoperationと1 episode recordingが未確認の場合は、先に [02 Data Collection](02_data_collection.md) を完了する。
 
 ### 5.2 timestamp付きrecording configを生成
 
-例として10秒・1 episodeの `sensor_timestamp_smoke` を作る。
+#### 変更する値
+
+| 変数 | 内容 | 値の決め方 |
+|---|---|---|
+| `RUN_ID` | Datasetとsidecarをまとめるrun名 | 既存Datasetと重複しない名前を付ける |
+| `TASK` | episodeのtask description | 収録内容を短く記述する |
+| `EPISODE_TIME_S` | recording時間 | testでは10秒程度から開始する |
+
+同じ`RUN_ID`をDataset、runtime config、sensor sidecarで共有する。
+
+#### 利用者向け実行コマンド
 
 ```bash
+RUN_ID=REPLACE_WITH_RUN_ID
+TASK="REPLACE_WITH_TASK"
+EPISODE_TIME_S=REPLACE_WITH_EPISODE_TIME_S
+
 mkdir -p .runtime data
 
 (
@@ -383,59 +458,123 @@ mkdir -p .runtime data
   uv run python ../scripts/build_runtime_config.py \
     --template ../config/record-template.yaml \
     --hardware ../config/hardware-local.yaml \
-    --output ../.runtime/sensor-timestamp-smoke.yaml \
-    --dataset-name sensor_timestamp_smoke \
-    --task "Sensor timestamp smoke test" \
+    --output "../.runtime/$RUN_ID.yaml" \
+    --dataset-name "$RUN_ID" \
+    --task "$TASK" \
     --num-episodes 1 \
-    --episode-time-s 10 \
-    --dataset-root ../data/sensor_timestamp_smoke
+    --episode-time-s "$EPISODE_TIME_S" \
+    --dataset-root "../data/$RUN_ID"
 )
 ```
 
-同名Datasetが既にある場合は別名を使用する。
+#### 次回実行コマンド — current workspace / Pattern B final acceptance
+
+以下は現在の検証workspaceで次回のPattern B final acceptanceに使用する具体値である。placeholderはない。
+
+```bash
+mkdir -p .runtime data
+
+test ! -e data/sensor_numeric_final
+
+(
+  cd lerobot_trossen
+
+  uv run python ../scripts/build_runtime_config.py \
+    --template ../config/record-template.yaml \
+    --hardware ../config/hardware-local.yaml \
+    --output ../.runtime/sensor_numeric_final.yaml \
+    --dataset-name sensor_numeric_final \
+    --task "High-rate numeric sensor final validation" \
+    --num-episodes 1 \
+    --episode-time-s 10 \
+    --dataset-root ../data/sensor_numeric_final
+)
+```
+
+`test ! -e` が失敗する場合は同名Datasetが既に存在する。既存Datasetを削除せず、利用者向け実行コマンドで別`RUN_ID`を設定する。
 
 ### 5.3 timestamp付きrecordingを実行
+
+#### 利用者向け実行コマンド
+
+```bash
+RUN_ID=REPLACE_WITH_RUN_ID
+
+(
+  cd lerobot_trossen
+
+  uv run python ../examples/custom_sensor/record_with_timestamps.py \
+    --config_path="../.runtime/$RUN_ID.yaml"
+)
+```
+
+#### 次回実行コマンド — current workspace / Pattern B final acceptance
 
 ```bash
 (
   cd lerobot_trossen
 
   uv run python ../examples/custom_sensor/record_with_timestamps.py \
-    --config_path=../.runtime/sensor-timestamp-smoke.yaml
+    --config_path=../.runtime/sensor_numeric_final.yaml
 )
 ```
 
-通常のLeRobotDatasetに加えて次が生成される。
+通常のLeRobotDatasetに加えて、利用者向けcommandでは次の形式で生成される。
 
 ```text
-data/sensor_timestamp_smoke/
+data/<RUN_ID>/
 └── meta/
     └── frame_timestamps/
         ├── episode_000000.jsonl
         └── episode_000000.meta.json
 ```
 
-代表robot時刻は:
+current workspaceの実機検証例では次になる。
 
 ```text
-observation_end_monotonic_ns
+data/sensor_numeric_final/meta/frame_timestamps/episode_000000.jsonl
+data/sensor_numeric_final/meta/frame_timestamps/episode_000000.meta.json
 ```
 
-である。
+代表robot時刻は `observation_end_monotonic_ns` である。
 
 ### 5.4 Datasetを検証
 
+#### 利用者向け実行コマンド
+
 ```bash
-./validate_dataset.sh data/sensor_timestamp_smoke
+RUN_ID=REPLACE_WITH_RUN_ID
+./validate_dataset.sh "data/$RUN_ID"
 ```
 
-`[PASS]` を確認する。
+#### 次回実行コマンド — current workspace / Pattern B final acceptance
+
+```bash
+./validate_dataset.sh data/sensor_numeric_final
+```
+
+#### 成功条件
+
+```text
+[PASS] Dataset matches the expected ALOHA reference schema.
+```
 
 ### 5.5 timestamp sidecarを確認
 
+#### 利用者向け実行コマンド
+
+```bash
+RUN_ID=REPLACE_WITH_RUN_ID
+
+head -n 2 \
+  "data/$RUN_ID/meta/frame_timestamps/episode_000000.jsonl"
+```
+
+#### 次回実行コマンド — current workspace / Pattern B final acceptance
+
 ```bash
 head -n 2 \
-  data/sensor_timestamp_smoke/meta/frame_timestamps/episode_000000.jsonl
+  data/sensor_numeric_final/meta/frame_timestamps/episode_000000.jsonl
 ```
 
 各recordに少なくとも以下が存在することを確認する。
@@ -460,171 +599,217 @@ observation_end_monotonic_ns
 - encoder
 - high-rate scalar / vector sensor
 
-この節は、**sensor-specific driver / SDKの起動そのものではなく、Section 4.1のnumeric contractを満たしたstreamをALOHAへ接続するところから**扱う。
+この節は、sensor-specific driver / SDKを起動してnumeric streamが利用可能になったところから開始する。
 
-本repositoryはROS 2 numeric topic用のgeneric loggerをreference pathとして提供する。
+### 6.1 Step B0 — topic / message type / actual rateを確認
 
-### 6.1 Checkpoint B0: numeric stream ready
+#### 変更する値
 
-ROS 2 streamを使用する場合、driverを起動したshell環境でtopicとmessage typeを実測してからreference loggerへ渡す。
+`SENSOR_TOPIC`を`ros2 topic list`から選ぶ。topic名は推測しない。
 
-まず利用可能なtopicを確認し、対象streamを1つ選ぶ。
+`MESSAGE_TYPE`は手入力で推測せず、`ros2 topic type`の出力を確認する。
+
+#### 利用者向け実行コマンド
 
 ```bash
 ros2 topic list
 
-SENSOR_TOPIC=<SENSOR_TOPIC>
+SENSOR_TOPIC=REPLACE_WITH_SENSOR_TOPIC
+
 ros2 topic type "$SENSOR_TOPIC"
 ros2 topic echo "$SENSOR_TOPIC" --once
 ros2 topic hz "$SENSOR_TOPIC"
 ```
 
-`ros2 topic type` の出力は、`ros2_timeseries_logger.py --msg-type` に渡す**完全修飾ROS 2 message type**である。例えばMMS101検証環境では次の形式を使用した。
+`ros2 topic type`が例えば次を返した場合、
 
 ```text
 geometry_msgs/msg/WrenchStamped
 ```
 
-単なるclass名 `WrenchStamped` ではなく、`ros2 topic type` が返した文字列をそのまま使用する。
+loggerへ渡す値も同じ完全修飾typeである。
 
-shell variableとして保持する場合:
+#### 実機検証例 — MMS101 / current workspace
+
+前提として、既存MMS101 driverが起動し `/force_torque/left` をpublishしていること。
 
 ```bash
-MESSAGE_TYPE=$(ros2 topic type "$SENSOR_TOPIC")
-printf 'topic       : %s\n' "$SENSOR_TOPIC"
-printf 'message type: %s\n' "$MESSAGE_TYPE"
+source /opt/ros/jazzy/setup.bash
+
+ros2 topic type /force_torque/left
+test "$(ros2 topic type /force_torque/left)" = "geometry_msgs/msg/WrenchStamped"
+ros2 topic echo /force_torque/left --once
+ros2 topic hz /force_torque/left
 ```
 
-記録する項目:
+このworkspaceで確認されたmessage typeは `geometry_msgs/msg/WrenchStamped` である。
+
+**[HW-VERIFIED]** subscriber側はMMS101 workspaceのoverlayを必要としない。MMS101 driverを別processで起動した状態で、環境を継承しないclean shellから `/opt/ros/jazzy/setup.bash` のみをsourceし、topic type / echoとgeneric loggerの3秒取得を確認した。loggerは298 sampleを保存した。
+
+#### 成功条件 B0
 
 ```text
-topic:
-message type:
-actual rate:
-source timestamp:
-```
-
-Pass criteria:
-
-```text
-[ ] <SENSOR_TOPIC> が存在する
-[ ] ros2 topic typeで完全修飾message typeを取得できる
+[ ] SENSOR_TOPICが存在する
+[ ] MESSAGE_TYPEを取得できる
 [ ] 1 message以上を受信できる
-[ ] ros2 topic hz が継続してsampleを観測する
+[ ] ros2 topic hzが継続してsampleを観測する
 [ ] payloadに必要なnumeric valueが含まれる
 ```
 
-B0を満たさない場合はSection 6.2以降へ進まない。sensor-specific driver / SDK / hardware設定、または既存実験環境の起動手順を確認する。本reference側でtopic名やdevice固有設定を推測して進めない。
+ここを満たさない場合はreference loggerへ進まず、sensor driver / SDK / hardware側を確認する。
 
-既存streamがROS 2ではない場合は、Section 4.1を満たすadapterを用意してから次へ進む。
+### 6.2 Step B1 — ROS Pythonを決める
 
-### 6.2 Logger単体test
+`ros2` commandが動作していても、activeな`python3`が`rclpy`と互換とは限らない。
 
-repository rootで、ROS 2 environmentをsourceしたshellから実行する。
-
-#### Python interpreterを確認する
-
-`ros2` commandが動作していても、activeな`python3`がROS 2の`rclpy`と互換とは限らない。特にconda / Miniforge等で別versionのPythonがactiveな場合、aptで導入したROS 2のPython extensionをimportできないことがある。
-
-実行前に確認する。
+#### 利用者向け実行コマンド
 
 ```bash
 which python3
 python3 --version
 /usr/bin/python3 --version
-```
 
-まずactiveなPythonで`rclpy` importを確認する。
-
-```bash
 python3 -c 'import sys, rclpy; print(sys.executable); print(sys.version)'
 ```
 
-これが失敗し、ROS 2をaptで導入した環境でsystem Pythonが対応versionの場合は、system Pythonで再確認する。
+activeな`python3`で失敗した場合は、ROS 2と互換なinterpreterを確認する。
 
 ```bash
 /usr/bin/python3 -c 'import sys, rclpy; print(sys.executable); print(sys.version)'
 ```
 
-後者のみ成功する場合、この節では次のように設定する。
+成功したinterpreterを`ROS_PYTHON`へ設定する。
 
 ```bash
-ROS_PYTHON=/usr/bin/python3
+ROS_PYTHON=REPLACE_WITH_ROS_COMPATIBLE_PYTHON
 ```
 
-activeな`python3`で`rclpy`をimportできる場合は次でよい。
+#### 実機検証例 — MMS101 / current workspace
 
 ```bash
-ROS_PYTHON=python3
+which python3
+python3 --version
+/usr/bin/python3 --version
+
+/usr/bin/python3 -c 'import sys, rclpy; print(sys.executable); print(sys.version)'
+/usr/bin/python3 -c 'import rclpy; print("rclpy import: OK")'
 ```
 
-#### Standalone logger
+このworkspaceでは次を確認した。
 
-Section 6.1で決めた`SENSOR_TOPIC`と`MESSAGE_TYPE`を使用する。以降のpath取り違えを避けるため、run名は1箇所で定義する。
+```text
+active python3     /home/ubuntu/miniforge3/bin/python3
+active version     Python 3.13.13
+system Python      Python 3.12.3
+ROS_PYTHON         /usr/bin/python3
+```
+
+#### 成功条件
+
+```text
+rclpy import: OK
+```
+
+### 6.3 Step B2 — sensor loggerを単体確認
+
+#### 変更する値
+
+| 変数 | 内容 | 調べ方 |
+|---|---|---|
+| `RUN_ID` | 単体testの識別名 | 一意な名前を付ける |
+| `SENSOR_TOPIC` | sensor topic | Step B0 |
+| `MESSAGE_TYPE` | 完全修飾ROS 2 type | Step B0 |
+| `ROS_PYTHON` | `rclpy`をimportできるPython | Step B1 |
+
+#### 利用者向け実行コマンド
 
 ```bash
-RUN_ID=sensor_numeric_smoke
+RUN_ID=REPLACE_WITH_RUN_ID
+SENSOR_TOPIC=REPLACE_WITH_SENSOR_TOPIC
+MESSAGE_TYPE=REPLACE_WITH_FULL_ROS2_MESSAGE_TYPE
+ROS_PYTHON=REPLACE_WITH_ROS_COMPATIBLE_PYTHON
+
 SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
-
 mkdir -p "$SENSOR_RUN_DIR"
 
 "$ROS_PYTHON" examples/custom_sensor/ros2_timeseries_logger.py \
   --topic "$SENSOR_TOPIC" \
   --msg-type "$MESSAGE_TYPE" \
   --sensor-id "$RUN_ID" \
-  --output "$SENSOR_RUN_DIR/standalone_raw.jsonl" \
+  --output "$SENSOR_RUN_DIR/raw.jsonl" \
   --duration 10
+
+wc -l "$SENSOR_RUN_DIR/raw.jsonl"
+head -n 1 "$SENSOR_RUN_DIR/raw.jsonl"
+cat "$SENSOR_RUN_DIR/raw.jsonl.meta.json"
 ```
 
-終了後:
+#### 実機検証例 — MMS101 / 実行済みcommand
+
+以下は実際に成功したcommandである。
 
 ```bash
-wc -l "$SENSOR_RUN_DIR/standalone_raw.jsonl"
-head -n 1 "$SENSOR_RUN_DIR/standalone_raw.jsonl"
-cat "$SENSOR_RUN_DIR/standalone_raw.jsonl.meta.json"
+source /opt/ros/jazzy/setup.bash
+
+mkdir -p data/_sensor_runs/numeric_smoke
+
+/usr/bin/python3 examples/custom_sensor/ros2_timeseries_logger.py \
+  --topic /force_torque/left \
+  --msg-type geometry_msgs/msg/WrenchStamped \
+  --sensor-id numeric_smoke \
+  --output data/_sensor_runs/numeric_smoke/raw.jsonl \
+  --duration 10
+
+wc -l data/_sensor_runs/numeric_smoke/raw.jsonl
+head -n 1 data/_sensor_runs/numeric_smoke/raw.jsonl
+cat data/_sensor_runs/numeric_smoke/raw.jsonl.meta.json
 ```
 
-確認するfield:
+実測結果:
 
 ```text
-sample_index
-source_timestamp_ns
-receive_monotonic_ns
-values
+1002 samples / 10 s
 ```
 
-`receive_monotonic_ns` がhost側alignment用timestampである。`source_timestamp_ns` はmessageに有効な `header.stamp` がある場合に保存される。
+先頭recordでは `wrench.force.x/y/z` と `wrench.torque.x/y/z` がnumeric valuesとして保存された。
 
-### Checkpoint B1
+#### 成功条件 B1
 
 ```text
 [ ] loggerがerrorなく終了
 [ ] raw.jsonlが0行ではない
 [ ] sample_indexが保存される
 [ ] receive_monotonic_nsが保存される
-[ ] receive_monotonic_nsが単調増加する
 [ ] valuesが空ではない
-[ ] ros2 topic hzでactual rateを確認した
+[ ] actual rateを確認できる
 ```
 
-`values` が空の場合、message payloadがgeneric numeric flatteningの対象外である。driver本体を書き換える前に、message変換用の薄いROS 2 adapterを追加することを検討する。
+### 6.4 Step B3 — concurrent recording用のrunを準備
 
-### 6.3 ALOHAと同時取得する
+単体testとconcurrent testは別`RUN_ID`を使用する。
 
-Section 6.2と同じ`RUN_ID`を使用する。別名のdataset directory / sensor sidecar directoryを手入力しない。
+#### 変更する値
+
+```text
+RUN_ID
+TASK
+EPISODE_TIME_S
+```
+
+#### 利用者向け実行コマンド
 
 ```bash
-RUN_ID=sensor_numeric_smoke
+RUN_ID=REPLACE_WITH_RUN_ID
+TASK="REPLACE_WITH_TASK"
+EPISODE_TIME_S=REPLACE_WITH_EPISODE_TIME_S
+
 SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
 DATASET_DIR="data/$RUN_ID"
 RUNTIME_CONFIG=".runtime/$RUN_ID.yaml"
 
 mkdir -p .runtime "$SENSOR_RUN_DIR"
-```
+test ! -e "$DATASET_DIR"
 
-まずruntime configを生成する。
-
-```bash
 (
   cd lerobot_trossen
 
@@ -633,43 +818,66 @@ mkdir -p .runtime "$SENSOR_RUN_DIR"
     --hardware ../config/hardware-local.yaml \
     --output "../$RUNTIME_CONFIG" \
     --dataset-name "$RUN_ID" \
-    --task "High-rate numeric sensor smoke test" \
+    --task "$TASK" \
     --num-episodes 1 \
-    --episode-time-s 10 \
+    --episode-time-s "$EPISODE_TIME_S" \
     --dataset-root "../$DATASET_DIR"
 )
 ```
 
-concurrent acquisitionでは、**sensor recording intervalがrobot recording interval全体を含むこと**を完了条件とする。
+#### 実機検証例 — MMS101 / current workspace final acceptance
+
+```bash
+mkdir -p .runtime data/_sensor_runs/sensor_numeric_final
+
+test ! -e data/sensor_numeric_final
+
+(
+  cd lerobot_trossen
+
+  uv run python ../scripts/build_runtime_config.py \
+    --template ../config/record-template.yaml \
+    --hardware ../config/hardware-local.yaml \
+    --output ../.runtime/sensor_numeric_final.yaml \
+    --dataset-name sensor_numeric_final \
+    --task "High-rate numeric sensor final validation" \
+    --num-episodes 1 \
+    --episode-time-s 10 \
+    --dataset-root ../data/sensor_numeric_final
+)
+```
+
+### 6.5 Step B4 — sensorとALOHAを同時取得
+
+重要なのは起動順である。
 
 ```text
-sensor logger START
+Terminal A: sensor driver
         ↓
-sensor sample受信を確認
+Terminal B: raw sensor logger START
         ↓
-ALOHA recording START
+loggerの開始messageを確認
         ↓
-10 s episode
+Terminal C: ALOHA recording START
         ↓
 ALOHA recording END
         ↓
-sensor logger END
+Terminal B: sensor logger END
 
 required:
 sensor recording interval ⊇ robot recording interval
 ```
 
-#### Terminal A: sensor-specific acquisition
-
-B0を通過したsensor driver / SDK / adapterを継続起動する。
-
-#### Terminal B: raw sensor logger
-
-repository rootで、Section 6.2で確認した`ROS_PYTHON`、`SENSOR_TOPIC`、`MESSAGE_TYPE`を使用する。新しいshellを開いた場合は同じ値を再設定する。
+#### Terminal B — 利用者向け実行コマンド
 
 ```bash
-RUN_ID=sensor_numeric_smoke
+RUN_ID=REPLACE_WITH_RUN_ID
+SENSOR_TOPIC=REPLACE_WITH_SENSOR_TOPIC
+MESSAGE_TYPE=REPLACE_WITH_FULL_ROS2_MESSAGE_TYPE
+ROS_PYTHON=REPLACE_WITH_ROS_COMPATIBLE_PYTHON
+
 SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+mkdir -p "$SENSOR_RUN_DIR"
 
 "$ROS_PYTHON" examples/custom_sensor/ros2_timeseries_logger.py \
   --topic "$SENSOR_TOPIC" \
@@ -679,39 +887,61 @@ SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
   --duration 30
 ```
 
-loggerの起動messageを確認し、sampleを受信できる状態になってからTerminal Cを開始する。ALOHA recordingが終了するまでloggerを停止してはならない。
-
-#### Terminal C: timestamp付きALOHA recording
-
-repository rootで実行する。
+#### Terminal B — 次回実行コマンド: MMS101 / current workspace final acceptance
 
 ```bash
-RUN_ID=sensor_numeric_smoke
-RUNTIME_CONFIG=".runtime/$RUN_ID.yaml"
-DATASET_DIR="data/$RUN_ID"
+source /opt/ros/jazzy/setup.bash
+
+mkdir -p data/_sensor_runs/sensor_numeric_final
+
+/usr/bin/python3 examples/custom_sensor/ros2_timeseries_logger.py \
+  --topic /force_torque/left \
+  --msg-type geometry_msgs/msg/WrenchStamped \
+  --sensor-id sensor_numeric_final \
+  --output data/_sensor_runs/sensor_numeric_final/raw.jsonl \
+  --duration 30
+```
+
+loggerの開始messageが出たらTerminal Cを開始する。
+
+#### Terminal C — 利用者向け実行コマンド
+
+```bash
+RUN_ID=REPLACE_WITH_RUN_ID
 
 (
   cd lerobot_trossen
 
   uv run python ../examples/custom_sensor/record_with_timestamps.py \
-    --config_path="../$RUNTIME_CONFIG"
+    --config_path="../.runtime/$RUN_ID.yaml"
 )
+
+./validate_dataset.sh "data/$RUN_ID"
 ```
 
-recording後:
+#### Terminal C — 次回実行コマンド: MMS101 / current workspace final acceptance
 
 ```bash
-./validate_dataset.sh "$DATASET_DIR"
+(
+  cd lerobot_trossen
+
+  uv run python ../examples/custom_sensor/record_with_timestamps.py \
+    --config_path=../.runtime/sensor_numeric_final.yaml
+)
+
+./validate_dataset.sh data/sensor_numeric_final
 ```
 
-`[PASS]` を確認する。
+#### 成功条件
 
-### 6.4 Current-value alignment
+Dataset validatorが`[PASS]`になり、sensor loggerの取得区間がrobot recording全体を包含すること。
 
-Section 6.3と同じ`RUN_ID`を使用する。
+### 6.6 Step B5 — causal alignment
+
+#### 利用者向け実行コマンド
 
 ```bash
-RUN_ID=sensor_numeric_smoke
+RUN_ID=REPLACE_WITH_RUN_ID
 SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
 DATASET_DIR="data/$RUN_ID"
 
@@ -722,46 +952,49 @@ python3 examples/custom_sensor/align_timeseries.py \
     "$SENSOR_RUN_DIR/raw.jsonl" \
   --output \
     "$SENSOR_RUN_DIR/aligned_latest.jsonl"
-```
 
-出力例:
-
-```text
-robot frames
-sensor samples
-aligned frames
-missing frames
-future samples used
-sensor age median
-sensor age p95
-sensor age max
-```
-
-続けて構造を検証する。
-
-```bash
 python3 examples/custom_sensor/validate_alignment.py \
   "$SENSOR_RUN_DIR/aligned_latest.jsonl" \
   --require-complete
 ```
 
-期待値:
+#### 実機検証例 — MMS101 / current workspace final acceptance
+
+```bash
+python3 examples/custom_sensor/align_timeseries.py \
+  --robot-frames \
+    data/sensor_numeric_final/meta/frame_timestamps/episode_000000.jsonl \
+  --sensor \
+    data/_sensor_runs/sensor_numeric_final/raw.jsonl \
+  --output \
+    data/_sensor_runs/sensor_numeric_final/aligned_latest.jsonl
+
+python3 examples/custom_sensor/validate_alignment.py \
+  data/_sensor_runs/sensor_numeric_final/aligned_latest.jsonl \
+  --require-complete
+```
+
+#### 成功条件
 
 ```text
-future samples used : 0
-malformed records   : 0
+aligned frames      = robot frames
+missing frames      = 0
+future samples used = 0
+malformed records   = 0
 [PASS]
 ```
 
-`missing frames` はsensor logger開始時刻、rate、drop、`--max-age-ms` 条件に依存する。`--require-complete`を使用したsmoke testでは0を完了条件とする。
+`future samples used = 0`だが先頭または末尾にまとまった`missing frames`が出る場合は、sensor loggerがrobot recording全体を包含していたか確認する。別runのraw fileを指定していないかも確認する。
 
-`future samples used = 0` だが先頭または末尾に多数の`missing frames`が出る場合は、まずsensor raw streamとrobot recordingの時間範囲を確認する。concurrent smoke testではsensor loggerを先に開始し、robot recording終了後まで継続させる。時間範囲が重なっていないraw fileを別runのDatasetへalignmentしてはならない。
+### 6.7 Step B6 — 200 ms history window
 
-### 6.5 History-window view
-
-200 msのhistoryを作る例:
+#### 利用者向け実行コマンド
 
 ```bash
+RUN_ID=REPLACE_WITH_RUN_ID
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+DATASET_DIR="data/$RUN_ID"
+
 python3 examples/custom_sensor/build_sensor_windows.py \
   --robot-frames \
     "$DATASET_DIR/meta/frame_timestamps/episode_000000.jsonl" \
@@ -772,118 +1005,139 @@ python3 examples/custom_sensor/build_sensor_windows.py \
   --window-ms 200
 ```
 
-確認する値:
+#### 実機検証例 — MMS101 / current workspace final acceptance
 
-```text
-ok frames
-insufficient frames
-future samples used
-samples/window median
-p05 / p95
-min / max
+```bash
+python3 examples/custom_sensor/build_sensor_windows.py \
+  --robot-frames \
+    data/sensor_numeric_final/meta/frame_timestamps/episode_000000.jsonl \
+  --sensor \
+    data/_sensor_runs/sensor_numeric_final/raw.jsonl \
+  --output \
+    data/_sensor_runs/sensor_numeric_final/windows_200ms.jsonl \
+  --window-ms 200
 ```
 
-### Checkpoint B2: integration complete
+#### 成功条件 B2
 
 ```text
 [ ] ALOHA Dataset validator -> PASS
-[ ] sensor raw streamをrobot recordingより前から取得
+[ ] sensor raw streamがrobot recording全体を包含
 [ ] robot timestamp sidecarが存在
 [ ] aligned frames = robot frames
 [ ] missing frames = 0
 [ ] future samples used = 0
-[ ] validation -> PASS
+[ ] alignment validation -> PASS
 [ ] history windowでfuture samples used = 0
 [ ] actual sensor rate / sensor ageを記録
 ```
 
-ここまででhigh-rate numeric sensorのsoftware-level integration確認を完了とする。
+ここまででPattern Bのsoftware-level integration確認を完了とする。
 
 ---
 
 ## 7. Validated example: MMS101
 
-**[HW-VERIFIED]**
+MMS101はPattern Bの具体例として使用する。
 
-MMS101をPattern Bの具体例として実機確認した。
+### 7.1 Driver / provenance
 
-### 7.1 Driver / provenanceの扱い
+検証では研究室内で使用されているROS 2 driverを利用した。このdriverには複数の開発・修正履歴があるため、sensor-specific driver sourceは本referenceの配布物に含めない。
 
-検証では研究室内で使用されているROS 2 driverを利用した。このdriverは複数の開発・修正履歴を含むため、**sensor-specific driver sourceは本referenceの配布物に含めない**。
-
-本referenceがMMS101について要求する開始条件は、driverの種類やlaunch file名ではなく次のinterfaceである。
+本reference側の開始条件はdriver名やlaunch file名ではなく、次のinterfaceである。
 
 ```text
 transport       ROS 2 topic
 payload         numeric 6-axis force / torque
 verified type   geometry_msgs/msg/WrenchStamped
+verified topic  /force_torque/left
 rate            固定値を仮定せず実測
 ```
 
-MMS101の接続、serial device設定、driver build、sensor initialization、calibration等はsensor-specific layerとして利用者側で準備する。既に別実験で使用しているdriverがある場合は、その環境を優先して再利用する。
+MMS101の接続、serial device設定、driver build、sensor initialization、calibrationはsensor-specific layerとして利用者側で準備する。
 
-### 7.2 Section 6へのhandoff
+### 7.2 別sensorへ置き換えるときの対応
 
-MMS101 driverを起動した後、topic名を確認する。
+| MMS101検証値 | 別sensorで決める値 | 調べ方 |
+|---|---|---|
+| `/force_torque/left` | `SENSOR_TOPIC` | `ros2 topic list` |
+| `geometry_msgs/msg/WrenchStamped` | `MESSAGE_TYPE` | `ros2 topic type "$SENSOR_TOPIC"` |
+| `/usr/bin/python3` | `ROS_PYTHON` | `rclpy` import test |
+| `sensor_numeric_final` | `RUN_ID` | 一意な名前を付ける |
+
+Section 6の「利用者向け実行コマンド」では上記を`REPLACE_WITH_...`へ代入する。Section 6の「実機検証例」はMMS101/current workspace向けの具体値をすべて入れたcommandである。
+
+### 7.3 現在までの実機確認
+
+**[HW-VERIFIED] interface boundary**
+
+MMS101 driverを別processで起動した状態で、subscriber側はROS 2 Jazzyの標準環境だけで接続できることを確認した。
+
+clean shell確認:
 
 ```bash
-ros2 topic list
+env -i \
+  HOME="$HOME" \
+  USER="$USER" \
+  LANG="${LANG:-C.UTF-8}" \
+  PATH=/usr/bin:/bin \
+  bash --noprofile --norc
 ```
 
-使用するtopicを1つ選び、message typeを実測する。
+clean shell内:
 
 ```bash
-SENSOR_TOPIC=<MMS101_TOPIC>
-MESSAGE_TYPE=$(ros2 topic type "$SENSOR_TOPIC")
+source /opt/ros/jazzy/setup.bash
 
-printf 'topic       : %s\n' "$SENSOR_TOPIC"
-printf 'message type: %s\n' "$MESSAGE_TYPE"
-ros2 topic echo "$SENSOR_TOPIC" --once
-ros2 topic hz "$SENSOR_TOPIC"
+ros2 topic type /force_torque/left
+ros2 topic echo /force_torque/left --once
 ```
 
-検証済みMMS101 streamでは次が得られた。
+確認結果:
 
 ```text
 geometry_msgs/msg/WrenchStamped
 ```
 
-この場合、その完全修飾message typeをgeneric loggerへそのまま渡せる。`WrenchStamped`だけを`--msg-type`へ指定してはならない。
+generic loggerも同じclean shellから実行し、3秒で298 sampleを保存した。
 
-logger実行前にSection 6.2の手順で`rclpy`をimport可能なPythonを確認し、`ROS_PYTHON`を設定する。
+したがって本referenceのsubscriber / logger側はMMS101固有workspaceをsourceしない。必要なのは、driver側でtopicが既にpublishされていることと、subscriber側でそのmessage packageを利用できることである。今回のmessage typeはROS 2標準の `geometry_msgs/msg/WrenchStamped` である。
 
-```bash
-RUN_ID=mms101_smoke
-SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
-mkdir -p "$SENSOR_RUN_DIR"
+**[HW-VERIFIED] standalone logger**
 
-"$ROS_PYTHON" examples/custom_sensor/ros2_timeseries_logger.py \
-  --topic "$SENSOR_TOPIC" \
-  --msg-type "$MESSAGE_TYPE" \
-  --sensor-id "$RUN_ID" \
-  --output "$SENSOR_RUN_DIR/standalone_raw.jsonl" \
-  --duration 10
-```
-
-この単体loggerがCheckpoint B1を通過した後、Section 6.3--6.5をそのまま実行する。
-
-MMS101を左右2台使用する場合も、integration contractは同じである。必要なstreamごとにlogger processを起動し、個体・取付位置のsemantic mappingは対象実験側のconfigurationとして管理する。
-
-### 7.3 Verified scope
-
-過去のreference validationでは、MMS101由来のROS 2 numeric streamについて次を確認している。
+通常shellでも次を確認した。
 
 ```text
-native-rate acquisition
-ALOHA concurrent recording
-robot/sensor causal latest-value alignment
-future sample = 0
-200 ms history-window generation
+MMS101 ROS 2 stream
+→ generic logger
+→ 1002 samples / 10 s
+→ raw JSONL + receive_monotonic_ns
 ```
 
-actual rateはdriver / configuration / host条件に依存するため、MMS101の固定仕様値として扱わない。各環境で `ros2 topic hz` と保存sample数から実測する。
+**[HW-VERIFIED] timestamp付きALOHA Dataset**
 
-実測値は [06 Validation Results](06_validation_results.md) を参照する。
+```text
+299 robot frames
+30 Hz
+14D action
+14D state
+4 cameras
+Dataset validator PASS
+```
+
+最初のconcurrent alignment確認では、robot 299 frameに対してsensor raw fileの時間範囲が一部しか重ならず、199 aligned / 100 missing / future 0となった。これはalignment algorithmのfuture useではなく、sensor recording intervalがrobot recording全体を包含する必要があることを確認した結果である。
+
+**Pattern B final acceptanceだけが未完了**である。Section 6.4--6.7の`RUN_ID=sensor_numeric_final`を実行し、
+
+```text
+aligned frames      = robot frames
+missing frames      = 0
+future samples used = 0
+alignment validation -> PASS
+history window future samples used = 0
+```
+
+まで確認した時点で、MMS101を使用する実機検証は完了とする。
 
 ---
 
@@ -896,82 +1150,94 @@ actual rateはdriver / configuration / host条件に依存するため、MMS101�
 - robot recording FPSと異なるcamera
 - native compressed streamを保持したいcamera
 
-この節は、**camera固有SDKや画像処理pipelineの構築ではなく、Section 4.2のcamera contractを満たしたstreamをALOHAへ接続するところから**扱う。
+この節はcamera固有SDKの構築ではなく、V4L2からcamera streamを取得可能になったところから開始する。
 
-本referenceではLinux V4L2で認識されるcameraを直接取得するpathを提供する。
+### 8.1 Step C0 — deviceとmodeを確認
 
-### 8.1 Checkpoint C0: camera stream ready
+#### 変更する値
 
-必要commandを確認する。
+```text
+DEVICE
+PIXEL_FORMAT
+WIDTH
+HEIGHT
+ADVERTISED_FPS
+```
+
+値は`v4l2-ctl`の出力から決める。
+
+#### 利用者向け実行コマンド
 
 ```bash
 v4l2-ctl --version
 ffmpeg -version
 ffprobe -version
-```
 
-対象cameraを列挙する。
-
-```bash
 v4l2-ctl --list-devices
-```
-
-stable pathがある場合:
-
-```bash
 ls -l /dev/v4l/by-id/
-```
 
-candidate deviceのformatを確認する。
+DEVICE=REPLACE_WITH_VIDEO_DEVICE
 
-```bash
 v4l2-ctl \
-  --device <VIDEO_DEVICE> \
+  --device "$DEVICE" \
   --list-formats-ext
 ```
 
-記録する。
+#### 実機検証例 — GelSight Mini / current workspace
 
-```text
-device:
-pixel format:
-resolution:
-advertised FPS:
+```bash
+v4l2-ctl --version
+ffmpeg -version
+ffprobe -version
+
+v4l2-ctl --list-devices
+
+v4l2-ctl --device /dev/video6 --list-formats-ext
+v4l2-ctl --device /dev/video26 --list-formats-ext
 ```
 
-Pass criteria:
+両candidate nodeで次を確認した。
+
+```text
+pixel format    MJPG
+resolution      3280x2464
+interval        0.040 s
+advertised FPS  25
+```
+
+Pattern Cの1台検証には `/dev/video6` を使用した。
+
+#### 成功条件 C0
 
 ```text
 [ ] target cameraを一意に選べる
-[ ] 使用するvideo nodeを決められる
+[ ] video nodeを決められる
 [ ] pixel format / resolution / advertised FPSを確認できる
-[ ] 継続captureに使用できるformatが存在する
+[ ] 継続captureに使用できるmodeが存在する
 ```
 
-C0を満たさない場合はSection 8.2以降へ進まない。camera固有のdriver / vendor setup / USB connection等を確認し、OSからstreamを取得可能にしてから戻る。
+### 8.2 Step C1 — camera単体capture
 
-V4L2を使用できずvendor SDKやROS 2 image topicのみ利用できる場合は、Section 4.2を満たすacquisition adapterを用意する。以下のFFmpeg pathをそのまま使用したとは記録しない。
-
-### 8.2 Camera単体capture
-
-native compressed formatとしてMJPEG等が利用できる場合、Pattern Cではcompressed stream copyを使用できる。
-
-path取り違えを避けるため、camera側でもrun名を1箇所で定義する。
+#### 利用者向け実行コマンド
 
 ```bash
-RUN_ID=sensor_camera_smoke
-SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
-mkdir -p "$SENSOR_RUN_DIR"
+RUN_ID=REPLACE_WITH_RUN_ID
+DEVICE=REPLACE_WITH_VIDEO_DEVICE
+WIDTH=REPLACE_WITH_WIDTH
+HEIGHT=REPLACE_WITH_HEIGHT
+ADVERTISED_FPS=REPLACE_WITH_ADVERTISED_FPS
 
-DEVICE=<VIDEO_DEVICE>
-OUT="$SENSOR_RUN_DIR/standalone_raw.mkv"
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+OUT="$SENSOR_RUN_DIR/raw.mkv"
+
+mkdir -p "$SENSOR_RUN_DIR"
 
 ffmpeg \
   -copyts \
   -f v4l2 \
   -input_format mjpeg \
-  -video_size <WIDTH>x<HEIGHT> \
-  -framerate <ADVERTISED_FPS> \
+  -video_size "${WIDTH}x${HEIGHT}" \
+  -framerate "$ADVERTISED_FPS" \
   -timestamps default \
   -t 10 \
   -i "$DEVICE" \
@@ -980,56 +1246,101 @@ ffmpeg \
   -copytb 1 \
   -avoid_negative_ts disabled \
   "$OUT"
+
+ffprobe -v error \
+  -select_streams v:0 \
+  -show_entries stream=codec_name,width,height,avg_frame_rate \
+  -of default=noprint_wrappers=1 \
+  "$OUT"
+
+python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
+  "$OUT" \
+  --output "$SENSOR_RUN_DIR/timestamps.jsonl"
 ```
 
-使用するpixel format / resolution / FPSはCheckpoint C0で対象cameraについて確認した値へ置き換える。
+#### 実機検証例 — GelSight Mini / current workspace
 
-出力を確認する。
+```bash
+mkdir -p data/_sensor_runs/gelsight_smoke
+
+ffmpeg -y \
+  -copyts \
+  -f v4l2 \
+  -input_format mjpeg \
+  -video_size 3280x2464 \
+  -framerate 25 \
+  -timestamps default \
+  -t 10 \
+  -i /dev/video6 \
+  -map 0:v:0 \
+  -c:v copy \
+  -copytb 1 \
+  -avoid_negative_ts disabled \
+  data/_sensor_runs/gelsight_smoke/raw.mkv
+```
+
+保存結果を確認した。
 
 ```bash
 ffprobe -v error \
   -select_streams v:0 \
   -show_entries stream=codec_name,width,height,avg_frame_rate \
   -of default=noprint_wrappers=1 \
-  "$OUT"
-```
+  data/_sensor_runs/gelsight_smoke/raw.mkv
 
-### 8.3 Packet timestampをexport
-
-repository rootで、Section 8.2と同じ`RUN_ID`を使用する。
-
-```bash
-RUN_ID=sensor_camera_smoke
-SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+ffmpeg -v error \
+  -i data/_sensor_runs/gelsight_smoke/raw.mkv \
+  -frames:v 1 \
+  -f null -
 
 python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
-  "$SENSOR_RUN_DIR/standalone_raw.mkv" \
-  --output "$SENSOR_RUN_DIR/standalone_timestamps.jsonl"
+  data/_sensor_runs/gelsight_smoke/raw.mkv \
+  --output data/_sensor_runs/gelsight_smoke/timestamps.jsonl
+
+wc -l data/_sensor_runs/gelsight_smoke/timestamps.jsonl
+head -n 2 data/_sensor_runs/gelsight_smoke/timestamps.jsonl
 ```
 
-scriptはframe数とeffective rateを表示する。
+確認結果:
 
-### Checkpoint C1
+```text
+codec             mjpeg
+resolution        3280x2464
+container rate    25/1
+video frames      188
+effective rate    18.754 Hz
+decode smoke      PASS
+timestamp export  PASS
+timestamp monotonic
+```
+
+capture開始時にFFmpegから `EOI missing, emulating` が1回表示されたが、MKV保存、frame decode、timestamp exportまで正常に完了した。
+
+#### 成功条件 C1
 
 ```text
 [ ] MKV captureが完了
 [ ] ffprobeでvideoを読める
-[ ] packet timestampが単調増加
-[ ] effective rateを記録
-[ ] advertised FPSとactual rateを区別した
+[ ] packet timestampをexportできる
+[ ] timestampが単調増加
+[ ] actual rateを確認できる
 ```
 
-### 8.4 ALOHAと同時取得
+### 8.3 Step C2 — concurrent recordingを準備
 
-Section 8.2と同じ`RUN_ID`を使用する。
+#### 利用者向け実行コマンド
 
 ```bash
-RUN_ID=sensor_camera_smoke
+RUN_ID=REPLACE_WITH_RUN_ID
+TASK="REPLACE_WITH_TASK"
+EPISODE_TIME_S=REPLACE_WITH_EPISODE_TIME_S
+
 SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
 DATASET_DIR="data/$RUN_ID"
 RUNTIME_CONFIG=".runtime/$RUN_ID.yaml"
 
 mkdir -p .runtime "$SENSOR_RUN_DIR"
+test ! -e "$DATASET_DIR"
 
 (
   cd lerobot_trossen
@@ -1039,31 +1350,72 @@ mkdir -p .runtime "$SENSOR_RUN_DIR"
     --hardware ../config/hardware-local.yaml \
     --output "../$RUNTIME_CONFIG" \
     --dataset-name "$RUN_ID" \
-    --task "Asynchronous camera smoke test" \
+    --task "$TASK" \
     --num-episodes 1 \
-    --episode-time-s 10 \
+    --episode-time-s "$EPISODE_TIME_S" \
     --dataset-root "../$DATASET_DIR"
 )
 ```
 
-camera recording intervalもrobot recording interval全体を含むようにする。
-
-#### Terminal A: asynchronous camera
-
-robot recordingより先に開始し、長めのdurationを指定する。
+#### 実機検証例 — GelSight Mini / current workspace
 
 ```bash
-RUN_ID=sensor_camera_smoke
+mkdir -p .runtime data/_sensor_runs/sensor_gelsight_final
+
+test ! -e data/sensor_gelsight_final
+
+(
+  cd lerobot_trossen
+
+  uv run python ../scripts/build_runtime_config.py \
+    --template ../config/record-template.yaml \
+    --hardware ../config/hardware-local.yaml \
+    --output ../.runtime/sensor_gelsight_final.yaml \
+    --dataset-name sensor_gelsight_final \
+    --task "Asynchronous GelSight camera smoke test" \
+    --num-episodes 1 \
+    --episode-time-s 10 \
+    --dataset-root ../data/sensor_gelsight_final
+)
+```
+
+### 8.4 Step C3 — cameraとALOHAを同時取得
+
+起動順:
+
+```text
+Terminal A: camera capture START
+        ↓
+FFmpegがframeを受信していることを確認
+        ↓
+Terminal B: ALOHA recording START
+        ↓
+ALOHA recording END
+        ↓
+Terminal A: camera capture END
+
+required:
+camera recording interval ⊇ robot recording interval
+```
+
+#### Terminal A — 利用者向け実行コマンド
+
+```bash
+RUN_ID=REPLACE_WITH_RUN_ID
+DEVICE=REPLACE_WITH_VIDEO_DEVICE
+WIDTH=REPLACE_WITH_WIDTH
+HEIGHT=REPLACE_WITH_HEIGHT
+ADVERTISED_FPS=REPLACE_WITH_ADVERTISED_FPS
+
 SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
-DEVICE=<VIDEO_DEVICE>
 OUT="$SENSOR_RUN_DIR/raw.mkv"
 
 ffmpeg \
   -copyts \
   -f v4l2 \
   -input_format mjpeg \
-  -video_size <WIDTH>x<HEIGHT> \
-  -framerate <ADVERTISED_FPS> \
+  -video_size "${WIDTH}x${HEIGHT}" \
+  -framerate "$ADVERTISED_FPS" \
   -timestamps default \
   -t 30 \
   -i "$DEVICE" \
@@ -1074,48 +1426,80 @@ ffmpeg \
   "$OUT"
 ```
 
-camera captureが開始してからTerminal Bへ進む。
-
-#### Terminal B: timestamp付きALOHA recording
-
-新しいshellでは同じ`RUN_ID`からpathを再生成する。
+#### Terminal A — 実機検証例: GelSight Mini / current workspace
 
 ```bash
-RUN_ID=sensor_camera_smoke
-RUNTIME_CONFIG=".runtime/$RUN_ID.yaml"
-DATASET_DIR="data/$RUN_ID"
+ffmpeg -y \
+  -copyts \
+  -f v4l2 \
+  -input_format mjpeg \
+  -video_size 3280x2464 \
+  -framerate 25 \
+  -timestamps default \
+  -t 40 \
+  -i /dev/video6 \
+  -map 0:v:0 \
+  -c:v copy \
+  -copytb 1 \
+  -avoid_negative_ts disabled \
+  data/_sensor_runs/sensor_gelsight_final/raw.mkv
+```
+
+FFmpegがframeを受信していることを確認してからTerminal Bを開始した。
+
+#### Terminal B — 利用者向け実行コマンド
+
+```bash
+RUN_ID=REPLACE_WITH_RUN_ID
 
 (
   cd lerobot_trossen
 
   uv run python ../examples/custom_sensor/record_with_timestamps.py \
-    --config_path="../$RUNTIME_CONFIG"
+    --config_path="../.runtime/$RUN_ID.yaml"
 )
+
+./validate_dataset.sh "data/$RUN_ID"
 ```
 
-recording後:
+#### Terminal B — 実機検証例: GelSight Mini / current workspace
 
 ```bash
-./validate_dataset.sh "$DATASET_DIR"
+(
+  cd lerobot_trossen
+
+  uv run python ../examples/custom_sensor/record_with_timestamps.py \
+    --config_path=../.runtime/sensor_gelsight_final.yaml
+)
+
+./validate_dataset.sh data/sensor_gelsight_final
 ```
 
-### 8.5 Camera timestampsをexport
+Dataset validatorで次を確認した。
+
+```text
+Dataset version   v3.0
+FPS               30
+frames            299
+episodes          1
+action            14D
+observation       14D
+RealSense videos  4
+validation        PASS
+```
+
+### 8.5 Step C4 — timestamp exportとcausal alignment
+
+#### 利用者向け実行コマンド
 
 ```bash
-RUN_ID=sensor_camera_smoke
+RUN_ID=REPLACE_WITH_RUN_ID
 SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+DATASET_DIR="data/$RUN_ID"
 
 python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
   "$SENSOR_RUN_DIR/raw.mkv" \
   --output "$SENSOR_RUN_DIR/timestamps.jsonl"
-```
-
-### 8.6 Causal alignment
-
-```bash
-RUN_ID=sensor_camera_smoke
-SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
-DATASET_DIR="data/$RUN_ID"
 
 python3 examples/custom_sensor/camera/align_camera_frames.py \
   --robot-frames \
@@ -1126,27 +1510,45 @@ python3 examples/custom_sensor/camera/align_camera_frames.py \
     "$SENSOR_RUN_DIR/aligned_latest.jsonl"
 ```
 
-確認する値:
+#### 実機検証例 — GelSight Mini / current workspace
 
-```text
-robot frames
-camera frames
-aligned frames
-missing frames
-future frames used
-reused assignments
-camera age median
-camera age p95
-camera age max
+```bash
+python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
+  data/_sensor_runs/sensor_gelsight_final/raw.mkv \
+  --output data/_sensor_runs/sensor_gelsight_final/timestamps.jsonl
+
+python3 examples/custom_sensor/camera/align_camera_frames.py \
+  --robot-frames \
+    data/sensor_gelsight_final/meta/frame_timestamps/episode_000000.jsonl \
+  --camera-timestamps \
+    data/_sensor_runs/sensor_gelsight_final/timestamps.jsonl \
+  --output \
+    data/_sensor_runs/sensor_gelsight_final/aligned_latest.jsonl
 ```
 
-robot FPSがcamera actual rateより高い場合、同じcamera frameが複数robot frameへ割り当てられることは正常である。
+確認結果:
 
-### Checkpoint C2: integration complete
+```text
+robot frames        299
+camera frames       750
+effective rate      18.728 Hz
+aligned frames      299
+missing frames      0
+future frames used  0
+reused assignments  111
+camera age median   26.461 ms
+camera age p95      50.617 ms
+camera age max      53.083 ms
+alignment           PASS
+```
+
+robot 30 Hzに対してcamera actual rateが約18.7 Hzであるため、`reused assignments = 111`は想定内である。
+
+#### 成功条件 C2
 
 ```text
 [ ] ALOHA Dataset validator -> PASS
-[ ] camera captureをrobot recordingより前から開始
+[ ] camera recordingがrobot recording全体を包含
 [ ] packet timestamp export -> PASS
 [ ] aligned frames = robot frames
 [ ] missing frames = 0
@@ -1155,7 +1557,7 @@ robot FPSがcamera actual rateより高い場合、同じcamera frameが複数ro
 [ ] camera age distributionを記録
 ```
 
-ここまででasynchronous cameraのsoftware-level integration確認を完了とする。
+robot FPSがcamera actual rateより高い場合、同じcamera frameが複数robot frameへ割り当てられることは正常である。
 
 FFmpeg / V4L2 optionの詳細は [Asynchronous Camera Reference](../examples/custom_sensor/camera/README.md) を参照する。
 
@@ -1165,90 +1567,65 @@ FFmpeg / V4L2 optionの詳細は [Asynchronous Camera Reference](../examples/cus
 
 **[HW-VERIFIED]**
 
-GelSight MiniをPattern Cのtest caseとして実機確認した。
+GelSight MiniをPattern Cのtest caseとして使用した。
 
-### 9.1 Software / driverの扱い
+### 9.1 Software / driver boundary
 
-GelSight固有のSDK、画像処理、marker tracking、calibration等はsensor-specific layerとして扱う。本referenceのPattern Cでは研究室固有のROS 2 wrapperを必須とせず、**GelSight MiniがLinux V4L2 cameraとして取得可能な状態**を開始点とした。
+GelSight固有SDK、画像処理、marker tracking、calibrationはsensor-specific layerとして扱う。本referenceでは研究室固有ROS 2 wrapperを必須とせず、Linux V4L2 cameraとしてstreamを取得可能な状態を開始点とする。
 
-別環境でvendor softwareやROS 2 wrapperを利用している場合も、それを置き換える必要はない。V4L2 pathを利用できるならSection 8へ直接接続し、V4L2を利用しない場合はSection 4.2のcamera contractを満たすacquisition pathを用意する。
-
-### 9.2 Device / mode確認
-
-```bash
-v4l2-ctl --list-devices
-ls -l /dev/v4l/by-id/
-```
-
-GelSightに対応するvideo nodeを確認し、必ず対象環境でformatを再確認する。
-
-```bash
-v4l2-ctl \
-  --device <GELSIGHT_VIDEO_DEVICE> \
-  --list-formats-ext
-```
-
-過去の検証機で使用したmode:
+### 9.2 Current workspaceで確認したinterface
 
 ```text
-pixel format       MJPEG
+device used        /dev/video6
+pixel format       MJPG / MJPEG
 resolution         3280x2464
 advertised FPS     25
+standalone frames  188 / 約10 s
+standalone rate    18.754 Hz
 ```
 
-これは別個体・firmware・hostに対する固定設定ではない。
+`/dev/video26`でも同じadvertised modeを確認したが、Pattern Cの1台validationには`/dev/video6`を使用した。
 
-### 9.3 Capture example
+device pathはUSB enumeration等で変化し得るため、別環境ではSection 8.1から再確認する。
 
-上記modeが対象環境でも確認できた場合の例:
+### 9.3 End-to-end validation
 
-```bash
-DEVICE=<GELSIGHT_VIDEO_DEVICE>
-OUT=data/_sensor_runs/gelsight_smoke.mkv
-
-ffmpeg \
-  -copyts \
-  -f v4l2 \
-  -input_format mjpeg \
-  -video_size 3280x2464 \
-  -framerate 25 \
-  -timestamps default \
-  -t 10 \
-  -i "$DEVICE" \
-  -map 0:v:0 \
-  -c:v copy \
-  -copytb 1 \
-  -avoid_negative_ts disabled \
-  "$OUT"
-```
-
-packet timestampをexportする。
-
-```bash
-python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
-  data/_sensor_runs/gelsight_smoke.mkv \
-  --output data/_sensor_runs/gelsight_smoke_timestamps.jsonl
-```
-
-過去のreference validationではactual rateは約18.7--18.8 Hzだった。advertised FPSをactual rateとして扱わず、各環境でtimestampから実測する。
-
-ALOHAと同時取得する場合はSection 8.4--8.6をそのまま実行する。
-
-### 9.4 Verified scope
-
-GelSight Mini 1台について次を確認している。
+current workspaceで次を最後まで確認した。
 
 ```text
-V4L2 native compressed acquisition
-packet timestamp保持
-ALOHA concurrent recording
-causal latest-frame alignment
-future frame = 0
+V4L2 /dev/video6
+→ MJPEG 3280x2464 @ advertised 25 fps
+→ FFmpeg stream copy
+→ MKV packet timestamp export
+→ timestamp付きALOHA recording
+→ Dataset validation
+→ causal latest-frame alignment
 ```
+
+final run:
+
+```text
+ALOHA frames        299
+ALOHA rate          30 Hz
+camera frames       750
+camera actual rate  18.728 Hz
+aligned frames      299
+missing frames      0
+future frames used  0
+reused assignments  111
+camera age median   26.461 ms
+camera age p95      50.617 ms
+camera age max      53.083 ms
+Dataset validation  PASS
+camera alignment    PASS
+```
+
+これにより、GelSight Mini 1台を用いたPattern Cのsoftware-level integration validationは完了とする。
 
 2台同時capture時のUSB / CPU / storage capacityは未検証であり、必要な構成では別途capacity testを行う。
 
-実測値は [06 Validation Results](06_validation_results.md) を参照する。
+最終的な実測値は [06 Validation Results](06_validation_results.md) にも記録する。
+
 
 ---
 
@@ -1461,6 +1838,7 @@ S0を満たさない場合はALOHA integrationへ進まない。
 ```text
 [ ] reference側でsensor単体取得
 [ ] ROS 2 loggerではrclpyとPython interpreterの互換性を確認
+[ ] standard messageをsubscribeするだけならsensor-specific workspaceがsubscriber側に不要か確認
 [ ] run ID / dataset path / sidecar pathを一貫させた
 [ ] raw sample/frameを保存
 [ ] timestampを保存

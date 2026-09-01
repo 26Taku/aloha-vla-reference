@@ -466,13 +466,33 @@ observation_end_monotonic_ns
 
 ### 6.1 Checkpoint B0: numeric stream ready
 
-ROS 2 streamを使用する場合、driverを起動したshell環境で次を確認する。
+ROS 2 streamを使用する場合、driverを起動したshell環境でtopicとmessage typeを実測してからreference loggerへ渡す。
+
+まず利用可能なtopicを確認し、対象streamを1つ選ぶ。
 
 ```bash
 ros2 topic list
-ros2 topic type <SENSOR_TOPIC>
-ros2 topic echo <SENSOR_TOPIC> --once
-ros2 topic hz <SENSOR_TOPIC>
+
+SENSOR_TOPIC=<SENSOR_TOPIC>
+ros2 topic type "$SENSOR_TOPIC"
+ros2 topic echo "$SENSOR_TOPIC" --once
+ros2 topic hz "$SENSOR_TOPIC"
+```
+
+`ros2 topic type` の出力は、`ros2_timeseries_logger.py --msg-type` に渡す**完全修飾ROS 2 message type**である。例えばMMS101検証環境では次の形式を使用した。
+
+```text
+geometry_msgs/msg/WrenchStamped
+```
+
+単なるclass名 `WrenchStamped` ではなく、`ros2 topic type` が返した文字列をそのまま使用する。
+
+shell variableとして保持する場合:
+
+```bash
+MESSAGE_TYPE=$(ros2 topic type "$SENSOR_TOPIC")
+printf 'topic       : %s\n' "$SENSOR_TOPIC"
+printf 'message type: %s\n' "$MESSAGE_TYPE"
 ```
 
 記録する項目:
@@ -488,7 +508,7 @@ Pass criteria:
 
 ```text
 [ ] <SENSOR_TOPIC> が存在する
-[ ] message typeを取得できる
+[ ] ros2 topic typeで完全修飾message typeを取得できる
 [ ] 1 message以上を受信できる
 [ ] ros2 topic hz が継続してsampleを観測する
 [ ] payloadに必要なnumeric valueが含まれる
@@ -502,23 +522,66 @@ B0を満たさない場合はSection 6.2以降へ進まない。sensor-specific 
 
 repository rootで、ROS 2 environmentをsourceしたshellから実行する。
 
-```bash
-mkdir -p data/_sensor_runs/numeric_smoke
+#### Python interpreterを確認する
 
-python3 examples/custom_sensor/ros2_timeseries_logger.py \
-  --topic <SENSOR_TOPIC> \
-  --msg-type <MESSAGE_TYPE> \
-  --sensor-id numeric_smoke \
-  --output data/_sensor_runs/numeric_smoke/raw.jsonl \
+`ros2` commandが動作していても、activeな`python3`がROS 2の`rclpy`と互換とは限らない。特にconda / Miniforge等で別versionのPythonがactiveな場合、aptで導入したROS 2のPython extensionをimportできないことがある。
+
+実行前に確認する。
+
+```bash
+which python3
+python3 --version
+/usr/bin/python3 --version
+```
+
+まずactiveなPythonで`rclpy` importを確認する。
+
+```bash
+python3 -c 'import sys, rclpy; print(sys.executable); print(sys.version)'
+```
+
+これが失敗し、ROS 2をaptで導入した環境でsystem Pythonが対応versionの場合は、system Pythonで再確認する。
+
+```bash
+/usr/bin/python3 -c 'import sys, rclpy; print(sys.executable); print(sys.version)'
+```
+
+後者のみ成功する場合、この節では次のように設定する。
+
+```bash
+ROS_PYTHON=/usr/bin/python3
+```
+
+activeな`python3`で`rclpy`をimportできる場合は次でよい。
+
+```bash
+ROS_PYTHON=python3
+```
+
+#### Standalone logger
+
+Section 6.1で決めた`SENSOR_TOPIC`と`MESSAGE_TYPE`を使用する。以降のpath取り違えを避けるため、run名は1箇所で定義する。
+
+```bash
+RUN_ID=sensor_numeric_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+
+mkdir -p "$SENSOR_RUN_DIR"
+
+"$ROS_PYTHON" examples/custom_sensor/ros2_timeseries_logger.py \
+  --topic "$SENSOR_TOPIC" \
+  --msg-type "$MESSAGE_TYPE" \
+  --sensor-id "$RUN_ID" \
+  --output "$SENSOR_RUN_DIR/standalone_raw.jsonl" \
   --duration 10
 ```
 
 終了後:
 
 ```bash
-wc -l data/_sensor_runs/numeric_smoke/raw.jsonl
-head -n 1 data/_sensor_runs/numeric_smoke/raw.jsonl
-cat data/_sensor_runs/numeric_smoke/raw.jsonl.meta.json
+wc -l "$SENSOR_RUN_DIR/standalone_raw.jsonl"
+head -n 1 "$SENSOR_RUN_DIR/standalone_raw.jsonl"
+cat "$SENSOR_RUN_DIR/standalone_raw.jsonl.meta.json"
 ```
 
 確認するfield:
@@ -548,26 +611,52 @@ values
 
 ### 6.3 ALOHAと同時取得する
 
-新しいDataset名を使用する。以下では `sensor_numeric_smoke` とする。
+Section 6.2と同じ`RUN_ID`を使用する。別名のdataset directory / sensor sidecar directoryを手入力しない。
+
+```bash
+RUN_ID=sensor_numeric_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+DATASET_DIR="data/$RUN_ID"
+RUNTIME_CONFIG=".runtime/$RUN_ID.yaml"
+
+mkdir -p .runtime "$SENSOR_RUN_DIR"
+```
 
 まずruntime configを生成する。
 
 ```bash
-mkdir -p .runtime data/_sensor_runs/sensor_numeric_smoke
-
 (
   cd lerobot_trossen
 
   uv run python ../scripts/build_runtime_config.py \
     --template ../config/record-template.yaml \
     --hardware ../config/hardware-local.yaml \
-    --output ../.runtime/sensor-numeric-smoke.yaml \
-    --dataset-name sensor_numeric_smoke \
+    --output "../$RUNTIME_CONFIG" \
+    --dataset-name "$RUN_ID" \
     --task "High-rate numeric sensor smoke test" \
     --num-episodes 1 \
     --episode-time-s 10 \
-    --dataset-root ../data/sensor_numeric_smoke
+    --dataset-root "../$DATASET_DIR"
 )
+```
+
+concurrent acquisitionでは、**sensor recording intervalがrobot recording interval全体を含むこと**を完了条件とする。
+
+```text
+sensor logger START
+        ↓
+sensor sample受信を確認
+        ↓
+ALOHA recording START
+        ↓
+10 s episode
+        ↓
+ALOHA recording END
+        ↓
+sensor logger END
+
+required:
+sensor recording interval ⊇ robot recording interval
 ```
 
 #### Terminal A: sensor-specific acquisition
@@ -576,48 +665,63 @@ B0を通過したsensor driver / SDK / adapterを継続起動する。
 
 #### Terminal B: raw sensor logger
 
-robot recordingより先に開始し、robot recordingより長いdurationを指定する。
+repository rootで、Section 6.2で確認した`ROS_PYTHON`、`SENSOR_TOPIC`、`MESSAGE_TYPE`を使用する。新しいshellを開いた場合は同じ値を再設定する。
 
 ```bash
-python3 examples/custom_sensor/ros2_timeseries_logger.py \
-  --topic <SENSOR_TOPIC> \
-  --msg-type <MESSAGE_TYPE> \
-  --sensor-id <SENSOR_ID> \
-  --output data/_sensor_runs/sensor_numeric_smoke/raw.jsonl \
+RUN_ID=sensor_numeric_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+
+"$ROS_PYTHON" examples/custom_sensor/ros2_timeseries_logger.py \
+  --topic "$SENSOR_TOPIC" \
+  --msg-type "$MESSAGE_TYPE" \
+  --sensor-id "$RUN_ID" \
+  --output "$SENSOR_RUN_DIR/raw.jsonl" \
   --duration 30
 ```
 
-loggerがsampleを受信している状態で次へ進む。
+loggerの起動messageを確認し、sampleを受信できる状態になってからTerminal Cを開始する。ALOHA recordingが終了するまでloggerを停止してはならない。
 
 #### Terminal C: timestamp付きALOHA recording
 
+repository rootで実行する。
+
 ```bash
+RUN_ID=sensor_numeric_smoke
+RUNTIME_CONFIG=".runtime/$RUN_ID.yaml"
+DATASET_DIR="data/$RUN_ID"
+
 (
   cd lerobot_trossen
 
   uv run python ../examples/custom_sensor/record_with_timestamps.py \
-    --config_path=../.runtime/sensor-numeric-smoke.yaml
+    --config_path="../$RUNTIME_CONFIG"
 )
 ```
 
 recording後:
 
 ```bash
-./validate_dataset.sh data/sensor_numeric_smoke
+./validate_dataset.sh "$DATASET_DIR"
 ```
 
 `[PASS]` を確認する。
 
 ### 6.4 Current-value alignment
 
+Section 6.3と同じ`RUN_ID`を使用する。
+
 ```bash
+RUN_ID=sensor_numeric_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+DATASET_DIR="data/$RUN_ID"
+
 python3 examples/custom_sensor/align_timeseries.py \
   --robot-frames \
-    data/sensor_numeric_smoke/meta/frame_timestamps/episode_000000.jsonl \
+    "$DATASET_DIR/meta/frame_timestamps/episode_000000.jsonl" \
   --sensor \
-    data/_sensor_runs/sensor_numeric_smoke/raw.jsonl \
+    "$SENSOR_RUN_DIR/raw.jsonl" \
   --output \
-    data/_sensor_runs/sensor_numeric_smoke/aligned_latest.jsonl
+    "$SENSOR_RUN_DIR/aligned_latest.jsonl"
 ```
 
 出力例:
@@ -637,7 +741,7 @@ sensor age max
 
 ```bash
 python3 examples/custom_sensor/validate_alignment.py \
-  data/_sensor_runs/sensor_numeric_smoke/aligned_latest.jsonl \
+  "$SENSOR_RUN_DIR/aligned_latest.jsonl" \
   --require-complete
 ```
 
@@ -651,6 +755,8 @@ malformed records   : 0
 
 `missing frames` はsensor logger開始時刻、rate、drop、`--max-age-ms` 条件に依存する。`--require-complete`を使用したsmoke testでは0を完了条件とする。
 
+`future samples used = 0` だが先頭または末尾に多数の`missing frames`が出る場合は、まずsensor raw streamとrobot recordingの時間範囲を確認する。concurrent smoke testではsensor loggerを先に開始し、robot recording終了後まで継続させる。時間範囲が重なっていないraw fileを別runのDatasetへalignmentしてはならない。
+
 ### 6.5 History-window view
 
 200 msのhistoryを作る例:
@@ -658,11 +764,11 @@ malformed records   : 0
 ```bash
 python3 examples/custom_sensor/build_sensor_windows.py \
   --robot-frames \
-    data/sensor_numeric_smoke/meta/frame_timestamps/episode_000000.jsonl \
+    "$DATASET_DIR/meta/frame_timestamps/episode_000000.jsonl" \
   --sensor \
-    data/_sensor_runs/sensor_numeric_smoke/raw.jsonl \
+    "$SENSOR_RUN_DIR/raw.jsonl" \
   --output \
-    data/_sensor_runs/sensor_numeric_smoke/windows_200ms.jsonl \
+    "$SENSOR_RUN_DIR/windows_200ms.jsonl" \
   --window-ms 200
 ```
 
@@ -724,26 +830,38 @@ MMS101 driverを起動した後、topic名を確認する。
 ros2 topic list
 ```
 
-使用するtopicを1つ選び、以下を確認する。
+使用するtopicを1つ選び、message typeを実測する。
 
 ```bash
 SENSOR_TOPIC=<MMS101_TOPIC>
+MESSAGE_TYPE=$(ros2 topic type "$SENSOR_TOPIC")
 
-ros2 topic type "$SENSOR_TOPIC"
+printf 'topic       : %s\n' "$SENSOR_TOPIC"
+printf 'message type: %s\n' "$MESSAGE_TYPE"
 ros2 topic echo "$SENSOR_TOPIC" --once
 ros2 topic hz "$SENSOR_TOPIC"
 ```
 
-`geometry_msgs/msg/WrenchStamped` がpublishされている場合、そのままgeneric loggerへ接続できる。
+検証済みMMS101 streamでは次が得られた。
+
+```text
+geometry_msgs/msg/WrenchStamped
+```
+
+この場合、その完全修飾message typeをgeneric loggerへそのまま渡せる。`WrenchStamped`だけを`--msg-type`へ指定してはならない。
+
+logger実行前にSection 6.2の手順で`rclpy`をimport可能なPythonを確認し、`ROS_PYTHON`を設定する。
 
 ```bash
-mkdir -p data/_sensor_runs/mms101_smoke
+RUN_ID=mms101_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+mkdir -p "$SENSOR_RUN_DIR"
 
-python3 examples/custom_sensor/ros2_timeseries_logger.py \
+"$ROS_PYTHON" examples/custom_sensor/ros2_timeseries_logger.py \
   --topic "$SENSOR_TOPIC" \
-  --msg-type geometry_msgs/msg/WrenchStamped \
-  --sensor-id mms101_smoke \
-  --output data/_sensor_runs/mms101_smoke/raw.jsonl \
+  --msg-type "$MESSAGE_TYPE" \
+  --sensor-id "$RUN_ID" \
+  --output "$SENSOR_RUN_DIR/standalone_raw.jsonl" \
   --duration 10
 ```
 
@@ -838,11 +956,15 @@ V4L2を使用できずvendor SDKやROS 2 image topicのみ利用できる場合�
 
 native compressed formatとしてMJPEG等が利用できる場合、Pattern Cではcompressed stream copyを使用できる。
 
+path取り違えを避けるため、camera側でもrun名を1箇所で定義する。
+
 ```bash
-mkdir -p data/_sensor_runs/camera_smoke
+RUN_ID=sensor_camera_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+mkdir -p "$SENSOR_RUN_DIR"
 
 DEVICE=<VIDEO_DEVICE>
-OUT=data/_sensor_runs/camera_smoke/raw.mkv
+OUT="$SENSOR_RUN_DIR/standalone_raw.mkv"
 
 ffmpeg \
   -copyts \
@@ -874,10 +996,15 @@ ffprobe -v error \
 
 ### 8.3 Packet timestampをexport
 
+repository rootで、Section 8.2と同じ`RUN_ID`を使用する。
+
 ```bash
+RUN_ID=sensor_camera_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+
 python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
-  data/_sensor_runs/camera_smoke/raw.mkv \
-  --output data/_sensor_runs/camera_smoke/timestamps.jsonl
+  "$SENSOR_RUN_DIR/standalone_raw.mkv" \
+  --output "$SENSOR_RUN_DIR/standalone_timestamps.jsonl"
 ```
 
 scriptはframe数とeffective rateを表示する。
@@ -894,10 +1021,15 @@ scriptはframe数とeffective rateを表示する。
 
 ### 8.4 ALOHAと同時取得
 
-新しいDataset名を使用する。以下では `sensor_camera_smoke` とする。
+Section 8.2と同じ`RUN_ID`を使用する。
 
 ```bash
-mkdir -p .runtime data/_sensor_runs/sensor_camera_smoke
+RUN_ID=sensor_camera_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+DATASET_DIR="data/$RUN_ID"
+RUNTIME_CONFIG=".runtime/$RUN_ID.yaml"
+
+mkdir -p .runtime "$SENSOR_RUN_DIR"
 
 (
   cd lerobot_trossen
@@ -905,22 +1037,26 @@ mkdir -p .runtime data/_sensor_runs/sensor_camera_smoke
   uv run python ../scripts/build_runtime_config.py \
     --template ../config/record-template.yaml \
     --hardware ../config/hardware-local.yaml \
-    --output ../.runtime/sensor-camera-smoke.yaml \
-    --dataset-name sensor_camera_smoke \
+    --output "../$RUNTIME_CONFIG" \
+    --dataset-name "$RUN_ID" \
     --task "Asynchronous camera smoke test" \
     --num-episodes 1 \
     --episode-time-s 10 \
-    --dataset-root ../data/sensor_camera_smoke
+    --dataset-root "../$DATASET_DIR"
 )
 ```
+
+camera recording intervalもrobot recording interval全体を含むようにする。
 
 #### Terminal A: asynchronous camera
 
 robot recordingより先に開始し、長めのdurationを指定する。
 
 ```bash
+RUN_ID=sensor_camera_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
 DEVICE=<VIDEO_DEVICE>
-OUT=data/_sensor_runs/sensor_camera_smoke/raw.mkv
+OUT="$SENSOR_RUN_DIR/raw.mkv"
 
 ffmpeg \
   -copyts \
@@ -942,39 +1078,52 @@ camera captureが開始してからTerminal Bへ進む。
 
 #### Terminal B: timestamp付きALOHA recording
 
+新しいshellでは同じ`RUN_ID`からpathを再生成する。
+
 ```bash
+RUN_ID=sensor_camera_smoke
+RUNTIME_CONFIG=".runtime/$RUN_ID.yaml"
+DATASET_DIR="data/$RUN_ID"
+
 (
   cd lerobot_trossen
 
   uv run python ../examples/custom_sensor/record_with_timestamps.py \
-    --config_path=../.runtime/sensor-camera-smoke.yaml
+    --config_path="../$RUNTIME_CONFIG"
 )
 ```
 
 recording後:
 
 ```bash
-./validate_dataset.sh data/sensor_camera_smoke
+./validate_dataset.sh "$DATASET_DIR"
 ```
 
 ### 8.5 Camera timestampsをexport
 
 ```bash
+RUN_ID=sensor_camera_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+
 python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
-  data/_sensor_runs/sensor_camera_smoke/raw.mkv \
-  --output data/_sensor_runs/sensor_camera_smoke/timestamps.jsonl
+  "$SENSOR_RUN_DIR/raw.mkv" \
+  --output "$SENSOR_RUN_DIR/timestamps.jsonl"
 ```
 
 ### 8.6 Causal alignment
 
 ```bash
+RUN_ID=sensor_camera_smoke
+SENSOR_RUN_DIR="data/_sensor_runs/$RUN_ID"
+DATASET_DIR="data/$RUN_ID"
+
 python3 examples/custom_sensor/camera/align_camera_frames.py \
   --robot-frames \
-    data/sensor_camera_smoke/meta/frame_timestamps/episode_000000.jsonl \
+    "$DATASET_DIR/meta/frame_timestamps/episode_000000.jsonl" \
   --camera-timestamps \
-    data/_sensor_runs/sensor_camera_smoke/timestamps.jsonl \
+    "$SENSOR_RUN_DIR/timestamps.jsonl" \
   --output \
-    data/_sensor_runs/sensor_camera_smoke/aligned_latest.jsonl
+    "$SENSOR_RUN_DIR/aligned_latest.jsonl"
 ```
 
 確認する値:
@@ -1288,6 +1437,7 @@ high-rate sensorをlocal controller / reflex側で処理し、summaryやstateの
 [ ] streamを継続取得できる
 [ ] interfaceを確認した
 [ ] data shape / unitまたはmessage typeを確認した
+[ ] ROS 2の場合はros2 topic typeで完全修飾message typeを取得した
 [ ] actual rateを測定できる
 ```
 
@@ -1310,11 +1460,14 @@ S0を満たさない場合はALOHA integrationへ進まない。
 
 ```text
 [ ] reference側でsensor単体取得
+[ ] ROS 2 loggerではrclpyとPython interpreterの互換性を確認
+[ ] run ID / dataset path / sidecar pathを一貫させた
 [ ] raw sample/frameを保存
 [ ] timestampを保存
 [ ] actual rateを記録
 [ ] ALOHA timestamp付きrecording
 [ ] concurrent acquisition
+[ ] sensor/camera recording intervalがrobot recording interval全体を含む
 [ ] ALOHA Dataset validation
 ```
 

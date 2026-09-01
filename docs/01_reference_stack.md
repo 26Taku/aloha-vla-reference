@@ -18,9 +18,9 @@
 | Trossen Arm library | 1.10.0 |
 | Dataset format | LeRobotDataset v3.0 |
 
-本成果物では最新版へ自動追従せず、実機で通したrevisionをreferenceとして固定する。versionを更新する場合の再検証条件は [05 Maintenance](05_maintenance.md) に記載する。
+本成果物では実機で通したrevisionをreferenceとして固定する。versionを更新する場合の再検証条件は [05 Maintenance](05_maintenance.md) に記載する。
 
-## 3. 想定hardware
+## 3. 想定hardwareとconfiguration
 
 baselineは以下の構成を対象とする。
 
@@ -33,13 +33,34 @@ baselineは以下の構成を対象とする。
   - `cam_left_wrist`
   - `cam_right_wrist`
 
-Arm IP addressとcamera serial numberはmachine-specific identifierであり、repositoryには実機値を保存しない。tracked templateにはplaceholderを置き、利用者が対象環境を調査してlocal configへ設定する。
+machine-specific hardware identityは、Git管理外の1ファイルに集約する。
 
-この設計は「特定のALOHA個体でのみ動く設定」を標準化しないためのものである。具体的なhardware identification手順は [02 Data Collection](02_data_collection.md) に一本化する。
+```text
+config/hardware-local.yaml
+```
+
+このfileには以下を設定する。
+
+```text
+4 ArmのIP address
+4 RealSenseのserial number
+```
+
+tracked configの役割は以下。
+
+```text
+hardware-template.yaml  hardware identityの入力template
+teleop-template.yaml    teleoperation固有設定
+record-template.yaml    recording固有設定
+```
+
+各wrapperは実行時に `hardware-local.yaml` と用途別templateを合成し、`.runtime/` 以下へLeRobot用configを生成する。
+
+具体的なhardware identificationとlocal config作成手順は [02 Data Collection](02_data_collection.md) に記載する。
 
 ## 4. この構成をbaselineとする理由
 
-本プロジェクトの主目的は、ALOHAを用いてVLA・模倣学習向けDatasetを再現可能に収集することである。
+本referenceの主目的は、ALOHAを用いてVLA・模倣学習向けDatasetを再現可能に収集し、camera・F/T・tactile等の追加sensorを案件ごとにゼロから設計し直さずに済む基準を残すことである。
 
 そのため、以下を一つのsoftware stackで扱えることを重視した。
 
@@ -50,28 +71,26 @@ Arm IP addressとcamera serial numberはmachine-specific identifierであり、r
 5. LeRobotDatasetへの保存
 6. LeRobot系training / inference stackへの接続性
 
-Trossen公式LeRobot pluginを使用することで、ALOHA固有hardware interfaceとLeRobot recording pipelineの接続をvendor側の公開実装へ寄せられる。研究室固有forkをbaselineにしないことで、project-specific変更と標準構成を分離できる。
+Trossen公式LeRobot pluginを使用することで、ALOHA固有hardware interfaceとLeRobot recording pipelineの接続をvendor側の公開実装へ寄せられる。研究固有機能はbaseline上の差分として追加する。
 
 ## 5. 他の構成との使い分け
 
 | 構成 | 本referenceでの位置づけ | 主な用途 |
 |---|---|---|
 | Trossen公式 LeRobot Plugin | **標準baseline** | teleoperation、RGB、state/action、LeRobotDataset収録 |
-| ROS 2 | optional adapter | 外部sensor driver、独立stream、他ROS nodeとの連携 |
+| ROS 2 | sensor acquisition adapter | ROS 2 driverで提供される外部sensor、他ROS nodeとの連携 |
 | Trossen driver直接利用 | project-specific | 独自制御、低レベルhardware access |
 | 研究用fork | project-specific | 既存研究機能を明示的に必要とする場合 |
 
-### ROS 2をbaselineにしない理由
+### ROS 2
 
-外部sensorのdriverとしてROS 2が有用な場合はあるが、すべてのsensorをROS 2へ統一すること自体は目的ではない。
+外部sensorにはROS 2、V4L2、serial API、vendor SDK等、deviceごとのinterfaceを使用する。
 
-外部sensorは取得rateやinterfaceが異なるため、LeRobotへ直接統合する場合と、ROS 2 / V4L2 / vendor SDK等で独立取得する場合を使い分ける。詳細は [03 Architecture and Extension](03_architecture_and_extension.md) を参照する。
+ROS 2 driverで提供されるF/TやIMU等はROS 2 adapterとして取得できる。sensor追加時の保存形式、timestamp、同期、検証項目は [03 Architecture and Extension](03_architecture_and_extension.md) を正とする。
 
-### 既存研究forkをbaselineにしない理由
+### 既存研究fork
 
-研究用途で変更されたrepositoryは、そのprojectには有用でも、どの変更が標準動作に必要か判別しにくい。
-
-本成果物では公式repositoryのclean revisionを別環境で検証し、研究固有機能が必要な案件だけ差分として追加する方針を採る。
+研究用途で変更されたrepositoryにはproject-specificな機能が含まれる。本referenceはTrossen公式repositoryのclean revisionをbaselineとし、必要な研究機能だけを明示的な差分として追加する。
 
 ## 6. Referenceとするもの / 環境ごとに決めるもの
 
@@ -83,16 +102,17 @@ Trossen公式LeRobot pluginを使用することで、ALOHA固有hardware interf
 - Dataset version
 - baseline schema
 - validation procedure
+- operation-specific template
 
 環境ごとに確認するもの:
 
 - Arm IP address
 - camera serial number
 - camera physical roleとの対応
-- optional external sensor device path / serial
+- external sensor device path / serial
 - data storage policy
 
-環境固有値をtracked fileへ残さないルールは [05 Maintenance](05_maintenance.md) に記載する。
+環境固有値は `hardware-local.yaml` またはproject-specific local fileに保持する。public repositoryへ含める情報の基準は [05 Maintenance](05_maintenance.md) に記載する。
 
 ## 7. Baselineから変更する場合
 

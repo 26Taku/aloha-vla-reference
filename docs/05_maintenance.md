@@ -4,15 +4,15 @@
 
 本資料は、**一度動作確認したreferenceを変更・更新するときのルール**を定める。
 
-初回利用手順は [02 Data Collection](02_data_collection.md)、設計変更の考え方は [03 Architecture and Extension](03_architecture_and_extension.md)、既存の実機検証結果は [06 Validation Results](06_validation_results.md) を参照する。
+初回利用手順は [02 Data Collection](02_data_collection.md)、sensor extensionの設計は [03 Architecture and Extension](03_architecture_and_extension.md)、実機検証結果は [06 Validation Results](06_validation_results.md) を参照する。
 
 ## 2. 基本方針
 
-本成果物は「常に最新版へ追従する環境」ではなく、実機で通したrevisionをreferenceとして固定する。
+実機で通したrevisionをreferenceとして固定する。
 
 reference versionは [01 Reference Stack](01_reference_stack.md) を正とする。
 
-更新は必要なときに明示的に行い、更新後にacceptance pathを再実行する。
+baselineに影響する変更後は [02 Data Collection](02_data_collection.md) のacceptance pathを再実行する。
 
 ## 3. Trossen / LeRobotを更新する場合
 
@@ -22,6 +22,7 @@ reference versionは [01 Reference Stack](01_reference_stack.md) を正とする
 [ ] dependency resolution
 [ ] robot / teleoperator type名
 [ ] config field名
+[ ] runtime config generation
 [ ] Arm connect / disconnect
 [ ] teleoperation
 [ ] camera acquisition
@@ -32,42 +33,64 @@ reference versionは [01 Reference Stack](01_reference_stack.md) を正とする
 [ ] custom robot-frame timestamp sidecar
 ```
 
-特に `examples/custom_sensor/record_with_timestamps.py` はLeRobot 0.6.0のrecord loopへ実行時patchを当てるreferenceである。
+`examples/custom_sensor/record_with_timestamps.py` はLeRobot 0.6.0のrecord loopへ実行時patchを当てる。
 
-upstreamのfunction signature、processor順序、dataset write位置、stop handlingが変わった場合は、そのまま使用しない。source diffを確認し、timestampを取得する意味的位置が維持されているかを確認してから実機smoke testを行う。
+upstreamのfunction signature、processor順序、dataset write位置、stop handlingを確認し、timestamp取得位置の意味が維持されていることを確認してから実機smoke testを行う。
 
 ## 4. Hardwareを変更する場合
 
 ### Arm
 
-対象環境のIPを再確認し、Git管理外の
+Armを交換した場合は、IPとphysical roleを [02 Data Collection](02_data_collection.md) の方法で確認し、
 
 ```text
-config/teleop-local.yaml
-config/record-local.yaml
+config/hardware-local.yaml
 ```
 
-だけを更新する。
-
-tracked templateのplaceholderは維持する。
+の対応fieldを更新する。
 
 ### RealSense
 
-camera交換・配置変更時は次を再確認する。
+camera交換・配置変更時は以下を確認する。
 
 - serial
 - physical role
 - resolution
-- FPS
-- teleoperation / recording config間のidentity
+- teleoperation時FPS
+- recording時FPS
 
-更新後は `check_hardware.sh` とteleoperationを再実行する。
+hardware identityは `config/hardware-local.yaml`、resolution / FPS等の用途別設定は `config/teleop-template.yaml` と `config/record-template.yaml` で管理する。
+
+更新後は `./check_hardware.sh`、teleoperation、one-episode recording、dataset validationを再実行する。
 
 ### External sensor
 
 device path、serial adapter、topic、driver、native rate、timestamp semanticsを再確認する。
 
-## 5. Public repositoryへ含めない値
+## 5. Configuration fileの役割
+
+```text
+config/hardware-template.yaml
+    machine-specific hardware identityのtemplate
+
+config/hardware-local.yaml
+    実機のArm IP / RealSense serial
+    Git管理外
+
+config/teleop-template.yaml
+    teleoperation固有設定
+
+config/record-template.yaml
+    recording固有設定
+
+.runtime/*.yaml
+    wrapperが生成するLeRobot実行用config
+    Git管理外
+```
+
+hardware identityのfieldを増減した場合は `scripts/build_runtime_config.py`、`check_hardware.sh`、各wrapper、Data Collectionの手順を同時に更新する。
+
+## 6. Public repositoryへ含めない値
 
 tracked fileへ保存しないもの:
 
@@ -77,7 +100,7 @@ tracked fileへ保存しないもの:
 - username / hostnameを含むabsolute path
 - 個人・組織固有のdataset namespace
 
-一方、再現性に意味がある以下はreferenceへ残してよい。
+referenceへ残すもの:
 
 - software version
 - verified upstream commit
@@ -86,9 +109,9 @@ tracked fileへ保存しないもの:
 - workstation specification
 - validationで得たrate / alignment統計
 
-公開前はworking treeだけでなくGit historyにもmachine-specific identifierが残っていないか確認する。private開発履歴に固有値が含まれている場合、public releaseはfinal treeからclean historyを作る方が安全である。
+公開前はworking treeとGit historyを確認する。private開発履歴にmachine-specific identifierが含まれる場合は、final treeからclean public historyを作成する。
 
-## 6. Dataset schemaを変更する場合
+## 7. Dataset schemaを変更する場合
 
 state / action / camera featureを変更した場合は以下を確認する。
 
@@ -99,11 +122,9 @@ state / action / camera featureを変更した場合は以下を確認する。
 - loaderで読み込めること
 - validatorの期待schema
 
-baseline validatorは4 RGB camera / 14D action / 14D stateを主対象とする。featureを追加する場合はvalidatorも更新する。
+baseline validatorは4 RGB camera / 14D action / 14D stateを対象とする。featureを変更した場合はvalidatorも更新する。
 
-## 7. External sensor referenceを変更する場合
-
-transportではなくtimestamp contractを維持する。
+## 8. External sensor referenceを変更する場合
 
 最低限保持する情報:
 
@@ -135,29 +156,27 @@ sensor/config metadata
 - packet timestamp domain
 - concurrent robot recordingへの影響
 
-## 8. Provenanceを維持する
+## 9. Provenanceを維持する
 
-vendor公式code、研究室/project-specific code、本成果物で新規作成したreference codeを混同しない。
+vendor公式code、project-specific code、本成果物で新規作成したreference codeを区別する。
 
-GelSightについてのPhase 1整理:
+GelSight code provenance:
 
 - GelSight Inc.公式 `gsrobotics`: GelSight Mini用OpenCV based SDK / demo
-- 研究室側helper: 公式構造をベースにproject-specific変更が加わったもの
-- 研究室側ROS 2 publisher: 元repositoryまでは特定できなかったproject-specific wrapper
+- project-specific helper: 公式構造をベースに変更されたもの
+- project-specific ROS 2 publisher: helperを利用するwrapper
 - 本成果物camera reference: V4L2/FFmpeg + timestamp alignmentとして独立実装
 
-vendor / upstream sourceを成果物へコピーする場合はlicenseと出典を別途確認する。
+vendor / upstream sourceを成果物へコピーする場合はlicenseと出典を確認する。
 
-## 9. 更新後のacceptance criteria
+## 10. 更新後のacceptance criteria
 
-baselineに影響する変更後は [02 Data Collection](02_data_collection.md) のacceptance pathを再実行する。
-
-最低限:
+baselineに影響する変更後:
 
 ```text
 setup
   ↓
-hardware identification / config
+hardware identification / hardware-local.yaml
   ↓
 hardware check
   ↓
@@ -168,6 +187,6 @@ one-episode recording
 dataset validation
 ```
 
-external sensor codeを変更した場合は、対象sensorのnative acquisitionとcausal alignmentも追加で確認する。
+external sensor codeを変更した場合は、対象sensorのnative acquisition、timestamp semantics、concurrent acquisition、causal alignmentも確認する。
 
-結果は [06 Validation Results](06_validation_results.md) またはproject-specific validation logへ追記する。
+結果は [06 Validation Results](06_validation_results.md) またはproject-specific validation logへ記録する。

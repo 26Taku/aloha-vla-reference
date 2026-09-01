@@ -1,40 +1,72 @@
 # Custom Sensor Reference
 
-このディレクトリは、ALOHA標準の30 Hz recordingとは取得周期やinterfaceが異なる外部sensorを扱うためのreference implementationである。
+このdirectoryは、ALOHA標準recordingとは取得周期やinterfaceが異なる外部sensorを扱うためのreference implementationをまとめる。
 
-基本方針は、**sensorのraw acquisition rateとrobot/policy rateを分離し、raw dataと実timestampを保持する**ことである。学習時に必要な30 Hz等の表現は、raw dataから後処理で生成する。
+sensor integration方式の選択、raw data、timestamp、software / hardware synchronizationの設計は [docs/03_architecture_and_extension.md](../../docs/03_architecture_and_extension.md) を参照する。本資料では各scriptの実行方法、入力、出力を扱う。
 
-この方式は研究室の実機で、ROS 2経由の高周期6軸F/T streamとGelSight Miniで確認した。これはsoftware-level synchronizationであり、hardware trigger、PTP、共有device clock等による同期ではない。
+基本方針:
+
+```text
+sensor acquisition rate != robot/control rate != policy rate
+
+raw data + timestamp              = canonical
+policy-specific synchronized view = derived
+```
 
 ## 1. Robot frame timestamp sidecar
 
-`record_with_timestamps.py` は、固定したLeRobot 0.6.0のrecording loopを実行時に差し替え、各Dataset frameについてhostのmonotonic clockによるtimestamp sidecarを追加する。インストール済みLeRobot packageのファイルは変更しない。
+`record_with_timestamps.py` はLeRobot 0.6.0のrecording loopへ実行時patchを適用し、各Dataset frameについてhost monotonic clockによるtimestamp sidecarを追加する。
 
-代表時刻には、robot observationがpolicy側で利用可能になった時点として `observation_end_monotonic_ns` を使用する。
+代表robot時刻には `observation_end_monotonic_ns` を使用する。
+
+### 1.1 timestamp付きrecording configを生成
+
+repository rootで、baselineのhardware identityとrecording templateからruntime configを生成する。
 
 ```bash
-cd /path/to/lerobot_trossen
-uv run python /path/to/examples/custom_sensor/record_with_timestamps.py \
-  --config_path=/path/to/record-config.yaml
+mkdir -p .runtime data
+
+(
+  cd lerobot_trossen
+
+  uv run python ../scripts/build_runtime_config.py \
+    --template ../config/record-template.yaml \
+    --hardware ../config/hardware-local.yaml \
+    --output ../.runtime/sensor-record.yaml \
+    --dataset-name sensor_reference \
+    --task "Sensor reference recording" \
+    --num-episodes 1 \
+    --episode-time-s 10 \
+    --dataset-root ../data/sensor_reference
+)
 ```
 
-Datasetに以下が追加される。
+### 1.2 recording
+
+```bash
+(
+  cd lerobot_trossen
+
+  uv run python ../examples/custom_sensor/record_with_timestamps.py \
+    --config_path=../.runtime/sensor-record.yaml
+)
+```
+
+Dataset rootに以下が追加される。
 
 ```text
-<dataset_root>/meta/frame_timestamps/
+data/sensor_reference/meta/frame_timestamps/
   episode_000000.jsonl
   episode_000000.meta.json
 ```
 
-このscriptはLeRobot 0.6.0のrecording implementationに依存するため、LeRobot更新時は `docs/05_maintenance.md` に従って再確認する。
+`record_with_timestamps.py` はLeRobot 0.6.0のrecording implementationに依存する。LeRobot更新時は [05 Maintenance](../../docs/05_maintenance.md) に従って再確認する。
 
 ## 2. High-rate numeric / time-series sensor
 
-ROS 2 topicとして提供される数値sensorは、`ros2_timeseries_logger.py` でnative rateのままJSONLへ保存できる。
+ROS 2 topicとして提供される数値sensorは `ros2_timeseries_logger.py` でnative / actual rateのままJSONLへ保存する。
 
-このscriptはoptional exampleであり、base setupはROS 2を導入しない。使用する場合は、対象PC上でROS 2と対象message packageが利用できる環境をsourceしてから実行する。
-
-例:
+対象PCでROS 2と対象message packageをsourceしたshellから実行する。
 
 ```bash
 python3 examples/custom_sensor/ros2_timeseries_logger.py \
@@ -45,19 +77,19 @@ python3 examples/custom_sensor/ros2_timeseries_logger.py \
   --duration 60
 ```
 
-各sampleには以下を保存する。
+各sample:
 
 - `sample_index`
-- publisherの `header.stamp` が存在する場合の `source_timestamp_ns`
-- callback受信時の `receive_monotonic_ns`
-- callback受信時のwall clock
-- message内のnumeric values
+- `source_timestamp_ns`（messageにtimestampがある場合）
+- `receive_monotonic_ns`
+- host wall clock
+- numeric values
 
-異なるclock domainを無条件に比較しないため、標準のalignmentには同一hostで取得した `receive_monotonic_ns` を使用する。
+同一hostでの標準alignmentには `receive_monotonic_ns` を使用する。
 
-### Current-value view
+### 2.1 Current-value view
 
-各robot frameに対して、未来を使用しない
+各robot frameに対して、
 
 ```text
 sensor_time <= robot_observation_time
@@ -67,7 +99,7 @@ sensor_time <= robot_observation_time
 
 ```bash
 python3 examples/custom_sensor/align_timeseries.py \
-  --robot-frames <dataset_root>/meta/frame_timestamps/episode_000000.jsonl \
+  --robot-frames data/sensor_reference/meta/frame_timestamps/episode_000000.jsonl \
   --sensor /tmp/example_ft.jsonl \
   --output /tmp/aligned_ft.jsonl
 
@@ -76,32 +108,75 @@ python3 examples/custom_sensor/validate_alignment.py \
   --require-complete
 ```
 
-### History-window view
+確認項目:
 
-高周期の波形情報を使う場合は、robot frame時刻 `t` に対して `(t-W, t]` のraw sample indexを保持する。
+- future sample = 0
+- missing
+- timestamp ordering
+- sensor age
+
+### 2.2 History-window view
+
+robot frame時刻 `t` に対して `(t-W, t]` のraw sample範囲を生成する。
 
 ```bash
 python3 examples/custom_sensor/build_sensor_windows.py \
-  --robot-frames <dataset_root>/meta/frame_timestamps/episode_000000.jsonl \
+  --robot-frames data/sensor_reference/meta/frame_timestamps/episode_000000.jsonl \
   --sensor /tmp/example_ft.jsonl \
   --output /tmp/ft_windows.jsonl \
   --window-ms 200
 ```
 
-raw valuesをDataset frameごとに複製せず、必要なsample範囲だけをmanifestとして保持する。
+outputはraw sample index / timestamp範囲を保持する。
 
 ## 3. Asynchronous camera
 
-GelSight等、実効camera rateがrobot recording rateと一致しないcameraは `camera/README.md` を参照する。
+GelSight等、実効camera rateがrobot recording rateと一致しないcameraは [camera/README.md](camera/README.md) を使用する。
 
-実機検証では、GelSight MiniのV4L2 MJPEG streamをdecode/re-encodeせず保存し、V4L2 packet PTSをhost monotonic clockとして保持した上で、30 Hzのrobot frameへcausal latest-frame alignmentした。
+reference path:
 
-## 4. Policy / VLAへの接続境界
+```text
+native compressed capture
+    ↓
+video + frame/packet timestamp
+    ↓
+timestamp export
+    ↓
+causal latest-frame alignment
+```
 
-収集時点ではraw dataを保持し、policy-specific representationは後から生成する。
+camera timestamp extraction:
+
+```text
+camera/extract_mkv_timestamps.py
+```
+
+robot frameへの対応付け:
+
+```text
+camera/align_camera_frames.py
+```
+
+## 4. 新しいsensorへ流用する場合
+
+adapterは次の情報を出力する。
+
+```text
+[ ] raw data
+[ ] sample/frame index
+[ ] source timestamp（取得可能な場合）
+[ ] host monotonic timestamp
+[ ] sensor/config metadata
+```
+
+実装後、[docs/03_architecture_and_extension.md](../../docs/03_architecture_and_extension.md) のvalidation checklistに従ってactual rate、timestamp、concurrent acquisition、causal alignmentを確認する。
+
+## 5. Policy / VLAへ渡すとき
+
+policy-specific representationはcanonical rawから生成する。
 
 - current value: causal latest sample/frame
-- history window: 時系列encoderへ渡す一定時間のraw sample群
-- fast/slow構成: 高速なlocal controller/reflexで処理したsummaryを低速VLAへ渡す
+- history window: 一定時間のraw sample群
+- fast/slow構成: 高周期local controllerで処理したsummaryを低速policyへ渡す
 
-どの表現を採るかはpolicy architectureに依存するため、raw acquisition formatで固定しない。
+具体的なrepresentationはpolicy architectureに合わせて決定する。

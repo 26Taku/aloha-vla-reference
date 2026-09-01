@@ -2,18 +2,20 @@
 
 ## 1. この資料の役割
 
-本資料は、研究室のALOHAを用いてVLA・模倣学習向けデータを収集する際の、**初回利用からDataset validation完了までの詳細操作マニュアル**である。
+本資料は、ALOHAを用いてVLA・模倣学習向けデータを収集する際の、**初回利用からDataset validation完了までの詳細操作マニュアル**である。
 
-初めて利用する場合は、このページを上から順に実行する。各段階を独立したcheckpointとして扱い、途中で問題が発生した場合は後段へ進まず、[04 Troubleshooting](04_troubleshooting.md) を参照してその段階で原因を切り分ける。
+初めて利用する場合は、このページを上から順に実行する。各段階をcheckpointとして扱い、問題が発生した場合は後段へ進まず [04 Troubleshooting](04_troubleshooting.md) を参照する。
 
-標準的な作業フロー:
+標準フロー:
 
 ```text
 Repository取得
     ↓
 Environment setup
     ↓
-Hardware identification / local configuration
+Arm / RealSense identification
+    ↓
+hardware-local.yaml 作成
     ↓
 Hardware check -> READY
     ↓
@@ -24,7 +26,7 @@ Recording -> one episode or more
 Dataset validation -> PASS
 ```
 
-対象とする標準構成と採用理由は [01 Reference Stack](01_reference_stack.md) に記載する。本資料では、実際に操作を進めるために必要な手順と各checkpointを扱う。
+対象とする標準構成と採用理由は [01 Reference Stack](01_reference_stack.md) に記載する。
 
 ---
 
@@ -55,7 +57,7 @@ pwd
 ls README.md setup.sh
 ```
 
-既存の研究用repositoryや個別プロジェクト用environmentを上書きせず、本成果物は独立したdirectoryで使用する。
+本成果物は独立したdirectoryで使用する。
 
 ---
 
@@ -73,7 +75,7 @@ ls README.md setup.sh
 - 検証済みcommitへ固定する
 - `uv sync --frozen` によりPython environmentを構築する
 - Python / LeRobot / Trossen Armのversionを表示する
-- 本成果物で使用するdata / log directoryを準備する
+- data / log directoryを準備する
 
 検証済み `lerobot_trossen` revision:
 
@@ -89,69 +91,62 @@ LeRobot      0.6.0
 Trossen Arm  1.10.0
 ```
 
-本成果物では検証済みrevisionを固定して使用する。最新版への追従は自動では行わない。LeRobot / Trossen Plugin / Trossen Arm等を更新する場合は、[05 Maintenance](05_maintenance.md) に従って再検証する。
+LeRobot / Trossen Plugin / Trossen Arm等を更新する場合は [05 Maintenance](05_maintenance.md) に従って再検証する。
 
 ### Checkpoint A
 
-以下を確認する。
-
 - `setup.sh` がerrorなく終了する
-- `lerobot_trossen` のcommitが上記reference revisionと一致する
+- `lerobot_trossen` のcommitがreference revisionと一致する
 - Python 3.12系である
-- LeRobot 0.6.0、Trossen Arm 1.10.0を含む検証済み構成が確認できる
-
-**Setup後はまだteleoperationへ進まない。次にhardware固有値を調査し、local configを作成する。**
+- LeRobot 0.6.0、Trossen Arm 1.10.0が確認できる
 
 ---
 
 ## 4. Hardware identification / local configuration
 
-### 4.1 目的
+### 4.1 確認する対応関係
 
-本repositoryのtracked configには、特定個体のArm IP addressやRealSense serial numberを保存しない。
+初回利用時に以下のphysical roleとidentifierを確認する。
 
-初回利用時は、単に候補identifierを列挙するだけでなく、**どのidentifierがどの物理deviceに対応するかまで確認した上で** local configへ設定する。
-
-確認する対応関係:
-
-| Physical role | Config field | Identifier |
+| Physical role | `hardware-local.yaml` field | Identifier |
 |---|---|---|
-| follower left | `robot.left_arm_ip_address` | Arm IP |
-| follower right | `robot.right_arm_ip_address` | Arm IP |
-| leader left | `teleop.left_arm_ip_address` | Arm IP |
-| leader right | `teleop.right_arm_ip_address` | Arm IP |
-| high camera | `robot.cameras.cam_high.serial_number_or_name` | RealSense serial |
-| low camera | `robot.cameras.cam_low.serial_number_or_name` | RealSense serial |
-| left wrist camera | `robot.cameras.cam_left_wrist.serial_number_or_name` | RealSense serial |
-| right wrist camera | `robot.cameras.cam_right_wrist.serial_number_or_name` | RealSense serial |
+| follower left | `arms.follower_left_ip` | Arm IP |
+| follower right | `arms.follower_right_ip` | Arm IP |
+| leader left | `arms.leader_left_ip` | Arm IP |
+| leader right | `arms.leader_right_ip` | Arm IP |
+| high camera | `cameras.cam_high` | RealSense serial |
+| low camera | `cameras.cam_low` | RealSense serial |
+| left wrist camera | `cameras.cam_left_wrist` | RealSense serial |
+| right wrist camera | `cameras.cam_right_wrist` | RealSense serial |
 
-列挙順、過去のconfig、他環境の値だけを根拠に対応関係を決めない。
+### 4.2 Arm IPとphysical roleを確認
 
-### 4.2 local configを作成
-
-tracked templateをコピーする。
+#### PC側network
 
 ```bash
-cp config/teleop-template.yaml config/teleop-local.yaml
-cp config/record-template.yaml config/record-local.yaml
+ip -br addr
 ```
 
-`*-local.yaml` は `.gitignore` 対象である。Arm IPやcamera serial等のmachine-specific identifierはlocal configにのみ設定し、tracked templateには書き込まない。
+Trossen標準kitの `192.168.1.x` 系Armを使用する場合は、`192.168.1.x/24` のIPv4 addressを持つUP状態のnetwork interfaceが存在することを確認する。
 
----
+表示例:
 
-### 4.3 Arm IPと物理Armを対応付ける
+```text
+<interface>    UP    192.168.1.1/24
+```
 
-Armでは、
+#### Arm Controllerを検出
 
-1. network上に存在するArm ControllerのIPを見つける
-2. そのIPが `follower left / follower right / leader left / leader right` のどれに対応するか確認する
+```bash
+(
+  cd lerobot_trossen
+  uv run trossen-arm discover
+)
+```
 
-という2段階が必要である。
+4台のArm ControllerについてIP、model、firmware、`Error State` が表示されることを確認する。
 
-#### 4.3.1 Trossen標準kitの参考IP
-
-Trossen公式ドキュメントでは、LeRobot等のTrossen-supported frameworkを使用するkitについて、以下のIP割り当てが期待値として示されている。
+Trossen標準kitの参考IP:
 
 | Physical role | 参考IP |
 |---|---|
@@ -160,76 +155,18 @@ Trossen公式ドキュメントでは、LeRobot等のTrossen-supported framework
 | follower left | `192.168.1.5` |
 | follower right | `192.168.1.4` |
 
-また、単体Arm Controllerのfactory default IPは `192.168.1.2` とされている。
+#### IPとphysical Armを対応付ける
 
-これらは**候補値・参考値であり、対象実機の対応を保証するものではない**。Arm ControllerのIPは変更可能なので、対象実機で物理Armとの対応を確認してからlocal configへ設定する。
-
-公式ソース:
-
-- Trossen Arm Documentation — Software Setup / Arm Network Setup  
-  https://docs.trossenrobotics.com/trossen_arm/main/getting_started/software_setup.html
-- Trossen Arm Documentation — Trossen AI Configuration  
-  https://docs.trossenrobotics.com/trossen_arm/main/tutorials/lerobot/configuration.html
-
-#### 4.3.2 事前安全確認
-
-Arm identification中はteleoperation / recordingを起動しない。Arm周辺に人や物体が干渉しないことを確認してから作業する。
-
-#### 4.3.3 PC側networkを確認
+検出したcandidate IPごとに以下を実行する。
 
 ```bash
-ip -br addr
-ip neigh
+(
+  cd lerobot_trossen
+  uv run trossen-arm identify --ip <ARM_IP>
+)
 ```
 
-PCがArm Controllerと同一subnetに接続されていることを確認する。
-
-`ip neigh` は候補deviceを把握する参考にはなるが、ARP cacheが残る場合があり、そこからphysical roleを確定することはできない。
-
-標準kitの参考IPを利用して到達性を確認する場合:
-
-```bash
-ping -c 2 192.168.1.2
-ping -c 2 192.168.1.3
-ping -c 2 192.168.1.4
-ping -c 2 192.168.1.5
-```
-
-4つすべてに応答があっても、その時点ではphysical roleとの対応は未確認である。
-
-#### 4.3.4 `trossen-arm discover` が利用できる場合
-
-Trossen Arm DriverにはArm Controllerを探索するCLIが用意されている。まず現在のpinned environmentで利用できるか確認する。
-
-```bash
-cd lerobot_trossen
-uv run trossen-arm --help
-uv run trossen-arm discover
-```
-
-`discover` はsubnet上のTrossen Arm Controllerを探索し、IP等を表示する。
-
-`trossen-arm` CLIは `trossen_arm` packageのoptional `cli` extraを必要とする。現在のpinned environmentでCLI dependenciesが入っていない場合は、実機確認の途中でenvironmentへ追加installして構成を変えず、後述のfallback方法を使用する。CLIを本成果物の標準依存へ追加する場合は、dependency変更として別途検証する。
-
-#### 4.3.5 `trossen-arm identify` でphysical roleを確認
-
-CLIが利用可能な場合は、指定IPの物理Armを識別できる。
-
-まずhelpを確認する。
-
-```bash
-uv run trossen-arm identify --help
-```
-
-周囲の安全を確認してからcandidate IPごとに実行する。
-
-```bash
-uv run trossen-arm identify --ip <CANDIDATE_IP>
-```
-
-公式CLIでは、指定IPへ接続し、gripperの開閉とcontroller LEDの変化によってphysical Armを識別する。
-
-どのArmが反応したかを記録し、最終的に以下を確定する。
+gripperが動作したphysical Armを確認し、次の対応を記録する。
 
 ```text
 follower left  -> <IP>
@@ -238,66 +175,33 @@ leader left    -> <IP>
 leader right   -> <IP>
 ```
 
-公式ソース:
+`identify` 実行前にgripper周辺へ指、工具、配線等がないことを確認する。
 
-- Trossen Arm Documentation — Command Line Interface (`discover`, `identify`)  
+公式資料:
+
+- Trossen Arm — Software Setup / Arm Network Setup  
+  https://docs.trossenrobotics.com/trossen_arm/main/getting_started/software_setup.html
+- Trossen Arm — Command Line Interface  
   https://docs.trossenrobotics.com/trossen_arm/main/getting_started/cli.html
 
-#### 4.3.6 Fallback: Ethernet接続を切り分ける
+### 4.3 RealSense serialとphysical roleを確認
 
-`identify` が使用できない場合は、robot control processを全て終了した状態でEthernet接続を切り分けて確認する。
-
-1. candidate IPへpingが通ることを確認する
-2. 物理ArmのEthernet接続を1台だけ外す
-3. candidate IPへ再度pingし、応答しなくなったIPを確認する
-4. Ethernetを再接続し、応答が復帰することを確認する
-5. 4 Armについて繰り返す
-
-例:
+以下を実行する。
 
 ```bash
-ping -c 2 <CANDIDATE_IP>
+(
+  cd lerobot_trossen
+  uv run lerobot-find-cameras realsense
+)
 ```
 
-`ip neigh` のentry消失だけではなく、ping等の実際の到達性で確認する。
-
----
-
-### 4.4 RealSense serialとphysical roleを対応付ける
-
-確認するphysical role:
+検出されたRealSenseのserialが表示され、cameraごとの画像が以下に保存される。
 
 ```text
-cam_high
-cam_low
-cam_left_wrist
-cam_right_wrist
+lerobot_trossen/outputs/captured_images/
 ```
 
-serialの一覧だけではphysical roleは分からない。各serialのcamera imageまたはlive viewを見て対応を確定する。
-
-#### 4.4.1 LeRobot utilityを使用する（推奨）
-
-setup後のenvironmentで以下を実行する。
-
-```bash
-cd lerobot_trossen
-uv run lerobot-find-cameras realsense
-```
-
-検出されたRealSenseのserial等が表示され、cameraごとの画像が `outputs/captured_images/` に保存される。
-
-例:
-
-```text
-outputs/captured_images/
-├── realsense__<SERIAL_A>.png
-├── realsense__<SERIAL_B>.png
-├── realsense__<SERIAL_C>.png
-└── realsense__<SERIAL_D>.png
-```
-
-画像を確認して、次のmappingを作る。
+保存画像を確認し、次の対応を記録する。
 
 ```text
 cam_high        -> <SERIAL>
@@ -306,110 +210,74 @@ cam_left_wrist  -> <SERIAL>
 cam_right_wrist -> <SERIAL>
 ```
 
-画像だけでは判別しにくい場合は、camera lensを1台ずつ手やカードで覆って再取得し、どのserialの画像が遮蔽されたかを確認する。
+画像だけで判別しにくい場合は、camera lensを1台ずつ手やカードで覆って再取得する。
 
-`Camera #0` のような列挙番号は恒久的なhardware identifierとして扱わない。本referenceではRealSense serialを使用する。
+公式資料:
 
-#### 4.4.2 RealSense Viewerを使用する
-
-利用可能な場合は、
-
-```bash
-realsense-viewer
-```
-
-を起動する。各cameraのlive viewとInfo欄のSerial Numberを対応付ける。
-
-物理cameraを1台ずつ手で覆う、あるいは視野内で明確な目印を動かすことでphysical roleを判別できる。
-
-#### 4.4.3 Fallback: 1台ずつ接続して確認
-
-上記で判別できない場合は、camera acquisition processを終了した状態でUSB接続を1台ずつ切り分ける。1台だけ接続した状態でserialとphysical positionを確認し、4台について繰り返す。
-
-USBを抜き差しする前にrecording / viewer等のcamera利用processを終了する。
-
-公式ソース:
-
-- Trossen Arm Documentation — Trossen AI Configuration / Camera Serial Number  
+- Trossen Arm — Trossen AI Configuration  
   https://docs.trossenrobotics.com/trossen_arm/main/tutorials/lerobot/configuration.html
-- Trossen SDK Documentation — Finding Device Identifiers  
+- Trossen SDK — Finding Device Identifiers  
   https://docs.trossenrobotics.com/trossen_sdk/configuration.html
 
----
+### 4.4 `hardware-local.yaml` を作成
 
-### 4.5 local configを編集
-
-repository rootへ戻る。
+repository rootで以下を実行する。
 
 ```bash
-cd ..
+cp config/hardware-template.yaml config/hardware-local.yaml
 ```
 
-すでにrepository rootにいる場合は不要である。
-
-編集対象:
-
-```text
-config/teleop-local.yaml
-config/record-local.yaml
-```
-
-任意のeditorを使用する。例:
+任意のeditorで開く。
 
 ```bash
-nano config/teleop-local.yaml
-nano config/record-local.yaml
+nano config/hardware-local.yaml
 ```
 
-両configで設定するhardware identity:
+前節で確認した4 ArmのIPと4 RealSenseのserialを設定する。
 
-```text
-robot.left_arm_ip_address
-robot.right_arm_ip_address
-teleop.left_arm_ip_address
-teleop.right_arm_ip_address
-robot.cameras.<camera_name>.serial_number_or_name
+例:
+
+```yaml
+arms:
+  follower_left_ip: <FOLLOWER_LEFT_IP>
+  follower_right_ip: <FOLLOWER_RIGHT_IP>
+  leader_left_ip: <LEADER_LEFT_IP>
+  leader_right_ip: <LEADER_RIGHT_IP>
+
+cameras:
+  cam_high: <CAM_HIGH_SERIAL>
+  cam_low: <CAM_LOW_SERIAL>
+  cam_left_wrist: <LEFT_WRIST_SERIAL>
+  cam_right_wrist: <RIGHT_WRIST_SERIAL>
 ```
 
-`robot.id: bimanual_follower` と `teleop.id: bimanual_leader` はLeRobot上のlogical identifierであり、hardware serialやIPではない。通常は変更しない。
+数字だけで構成されるcamera serialは、YAML上で引用符あり・なしのどちらでも入力できる。runtime config生成時に文字列へ正規化される。
 
-`teleop-local.yaml` と `record-local.yaml` ではhardware identityを一致させる。一方、本repositoryではteleoperation時のcamera FPSを15、recording時のcamera FPSを30としており、用途に応じて取得設定が異なる。この差は意図したものであり、hardware identityの不一致ではない。
-
-### 4.6 placeholderとGit管理状態を確認
-
-次が無出力になることを確認する。
+`hardware-local.yaml` は `.gitignore` 対象である。Git管理状態を確認する。
 
 ```bash
-grep -RIn 'REPLACE_WITH_' \
-  config/teleop-local.yaml \
-  config/record-local.yaml
+git check-ignore -v config/hardware-local.yaml
 ```
 
-local configがGit管理外であることも確認する。
+placeholderが残っていないことを確認する。
 
 ```bash
-git check-ignore -v \
-  config/teleop-local.yaml \
-  config/record-local.yaml
+grep -n 'REPLACE_WITH_' config/hardware-local.yaml
 ```
+
+このcommandが無出力になることを確認する。
 
 ### Checkpoint B
 
-以下をすべて満たしてから次へ進む。
-
-- 4 ArmのIPと `follower left / follower right / leader left / leader right` の物理対応を確認した
-- 4 RealSense serialと `cam_high / cam_low / cam_left_wrist / cam_right_wrist` の物理対応を確認した
-- 対応を列挙順や推測だけで決めていない
-- 両local configへ同じhardware mappingを反映した
+- 4 ArmのIPとphysical roleの対応を確認した
+- 4 RealSense serialとphysical roleの対応を確認した
+- `config/hardware-local.yaml` に8個のidentifierを設定した
 - `REPLACE_WITH_` が残っていない
-- machine-specific identifierをtracked templateへ書いていない
-- local configがGit管理対象外であることを確認した
+- `hardware-local.yaml` がGit管理対象外である
 
 ---
 
 ## 5. Hardware check
-
-### 5.1 実行
 
 ALOHAとcameraの電源・接続を確認してから実行する。
 
@@ -417,51 +285,52 @@ ALOHAとcameraの電源・接続を確認してから実行する。
 ./check_hardware.sh
 ```
 
-### 5.2 目的
+このscriptは `hardware-local.yaml` とtracked templateからpreflight用runtime configを生成し、主に以下を確認する。
 
-recordingを開始する前に、local configと実機の基本状態が一致していることを確認する。
-
-checkerは主に以下を確認する。
-
-- `config/teleop-local.yaml` / `config/record-local.yaml` の存在
-- placeholderが残っていないこと
-- teleoperation / recording config間のArm IPとcamera serial mapping
-- 使用するsoftware version
-- Armへのnetwork reachability
-- RealSense D405の認識
-- camera serialが設定値と一致すること
-- data directoryへの書き込み可否
+- local hardware configが完成している
+- runtime configが生成できる
+- software version
+- 4 Armへのnetwork reachability
+- RealSense D405 x4の認識
+- configured camera serialとの一致
+- data directoryへの書き込み
 - storage free space
 
-すべて通ると `[READY]` を表示する。
-
-### Checkpoint C
+すべて通ると以下を表示する。
 
 ```text
 [READY]
 ```
 
-が出ること。
+### Checkpoint C
 
-Armへのping成功はnetwork reachabilityを示すだけであり、robot driverを用いた実動作まで保証するものではない。実際のLeader-Follower制御は次のteleoperationで確認する。
-
-すべてのArmへのpingが失敗する場合は、まずArm本体・controllerの電源とPC側networkを確認する。
+`[READY]` を確認してからteleoperationへ進む。
 
 ---
 
 ## 6. Teleoperation
 
-### 6.1 実行
+### 6.1 実行前の安全確認
+
+Follower Arm周辺に、人、工具、camera、配線等の干渉物がないことを確認する。
+
+### 6.2 起動直後の操作
 
 ```bash
 ./teleoperate.sh
 ```
 
-### 6.2 目的
+command実行後、Follower Armが起動時のstaged positionへ移動し、camera等の初期化が進む。
 
-recording前に、Leader-Follower制御とcamera acquisitionを実機で確認する。
+実機検証では、**Leader Armを動かせる状態になってからFollowerの追従loopが開始するまで短い時間差が生じる場合がある**ことを確認した。
 
-確認対象:
+追従開始を確認するまではLeaderを大きく移動しない。Leaderを現在位置付近で保持し、小さな動きにFollowerが連続して追従することを確認してから通常操作を開始する。
+
+追従開始前にLeaderを大きく移動すると、追従loop開始時にFollowerがLeaderの現在姿勢へ急速に移動し、joint velocity limit等で安全停止する場合がある。
+
+### 6.3 動作確認
+
+recording前に以下を確認する。
 
 - left leader -> left follower
 - right leader -> right follower
@@ -470,27 +339,32 @@ recording前に、Leader-Follower制御とcamera acquisitionを実機で確認�
 - `cam_low`
 - `cam_left_wrist`
 - `cam_right_wrist`
-- 不自然な振動や連続的な異常動作がないこと
+- 不自然な振動や連続的な異常動作がない
 
-終了時は:
+終了時は `Ctrl+C` を使用し、Armおよびcameraが正常にdisconnectされることを確認する。
 
-```text
-Ctrl+C
-```
+### 6.4 異常停止した場合
 
-を使用し、Armおよびcameraが正常にdisconnectされることを確認する。
+`Joint limit exceeded` 等でteleoperationが異常終了すると、Arm Controllerが現在姿勢を保持したままidle/error状態になる場合がある。
+
+**Armがresting positionにない状態でControllerの電源を切る場合は、電源OFF前に必ずArmを物理的に支持する。**
+
+power offで保持力が失われると、Armが自重で落下して机、camera、他Arm等へ衝突する可能性がある。
+
+復旧手順は [04 Troubleshooting](04_troubleshooting.md#7-teleoperationが-joint-limit-exceeded-で停止する) を参照する。
 
 ### Checkpoint D
 
 - left/rightのLeader-Follower対応が正しい
 - gripperが意図した側で動く
 - 4 camera viewのphysical mappingが正しい
+- Followerの追従開始を確認してから通常操作を開始できる
 - 異常な動作がない
 - `Ctrl+C` 後に正常にdisconnectできる
 
-検証済み標準構成ではteleoperation loopが概ね30 Hzで動作した。ただし実周期はPC負荷やcamera処理等の影響を受けるため、常に厳密な30 Hzを保証するものではない。
+検証済み標準構成ではteleoperation loopが概ね30 Hzで動作した。
 
-Rerun / Vulkan / EGL等のwarningが表示されてもteleoperation自体が正常に動作する場合がある。warning文字列だけで失敗と判断せず、[04 Troubleshooting](04_troubleshooting.md) を参照する。
+Rerun / Vulkan / EGL等のwarningが表示されてもteleoperation自体が正常に動作する場合がある。既知の症状は [04 Troubleshooting](04_troubleshooting.md) を参照する。
 
 ---
 
@@ -512,21 +386,21 @@ Rerun / Vulkan / EGL等のwarningが表示されてもteleoperation自体が正�
 
 ### 7.2 `record.sh` が行うこと
 
-- `config/record-local.yaml` を基にruntime configを生成する
+- `config/hardware-local.yaml` を読み込む
+- `config/record-template.yaml` とhardware identityを合成する
 - dataset名を設定する
 - task descriptionを設定する
 - episode数とepisode時間を設定する
 - local保存先を設定する
 - Hugging Face Hubへの自動uploadを無効にする
+- `.runtime/record-<DATASET_NAME>.yaml` を生成する
 - Trossen公式 `lerobot-record` を実行する
 
-runtime configはrepository内の一時directoryに生成され、Git管理対象には含めない。
-
-同名datasetが既に存在する場合は上書きせず停止する。必要なdatasetを誤って削除しないよう、既存datasetの扱いを確認してから再実行する。
+同名datasetが既に存在する場合は上書きせず停止する。
 
 ### 7.3 標準recording構成
 
-本成果物で確認したbaselineは以下。
+baseline:
 
 - dataset format: LeRobotDataset v3.0
 - target fps: 30
@@ -549,7 +423,7 @@ runtime configはrepository内の一時directoryに生成され、Git管理対�
 - episode data / Parquetが保存されている
 - 4 cameraのvideoが保存されている
 
-検証済み構成では、15秒・1 episodeのbaseline収録で449 framesが保存された。target fps × episode時間と保存frame数は、実行境界や処理負荷等により完全一致しない場合があるため、固定frame数だけで成否を判断しない。
+15秒・1 episodeのreference testでは449 framesが保存された。frame数は実行境界や処理負荷の影響を受けるため、固定frame数だけで成否を判断しない。
 
 ---
 
@@ -567,30 +441,28 @@ LeRobotDataset
 └── dataset metadata
 ```
 
-本成果物のbaseline schema:
+baseline schema:
 
 ```text
 action             14D
 observation.state  14D
-camera              4 streams
-dataset format      LeRobotDataset v3.0
+camera             4 streams
+dataset format     LeRobotDataset v3.0
 ```
 
-camera画像はdataset内ではvideoとして保存され、Parquetにはrobot state/actionやframe/timestamp等の情報が保存される。
+camera画像はvideoとして保存され、Parquetにはrobot state/actionやframe/timestamp等の情報が保存される。
 
-具体的なschema例は以下に保存している。
+schema例:
 
 ```text
 reference/dataset_examples/baseline/info.json
 ```
 
-実機検証したdatasetの詳細な結果は [06 Validation Results](06_validation_results.md) を参照する。
+実機検証結果は [06 Validation Results](06_validation_results.md) を参照する。
 
 ---
 
 ## 9. Dataset validation
-
-### 9.1 実行
 
 ```bash
 ./validate_dataset.sh data/DATASET_NAME
@@ -602,13 +474,9 @@ reference/dataset_examples/baseline/info.json
 ./validate_dataset.sh data/test_dataset
 ```
 
-### 9.2 目的
-
-recording processが終了しただけでは、学習用datasetとして必要な構造とfileが揃っていることまでは保証できない。そのため、収録後にdataset自体を検証する。
-
 validatorでは主に以下を確認する。
 
-- `meta/info.json` が読み込める
+- `meta/info.json`
 - Dataset version
 - fps
 - episode数
@@ -616,16 +484,16 @@ validatorでは主に以下を確認する。
 - expected camera features
 - action dimension
 - observation state dimension
-- Parquet fileの存在
-- 必要columnの存在
+- Parquet file
+- 必要column
 - row数
 - frame indexの連続性
 - timestampの単調増加
 - metadataと実データの整合性
-- video fileの存在
+- video file
 - video resolution
 - average fps
-- video先頭frameがdecode可能であること
+- video先頭frameのdecode
 
 すべて通れば `[PASS]` を表示する。
 
@@ -635,38 +503,36 @@ validatorでは主に以下を確認する。
 [PASS]
 ```
 
-が出ること。
+を確認する。
 
-validatorはDataset構造の健全性を確認するものであり、demonstrationそのものの品質を評価するものではない。task failure、操作ミス、camera occlusion等は別途確認する。
+validatorはDataset構造の健全性を確認する。demonstrationのtask成功、操作品質、camera occlusion等は収録内容として別途確認する。
 
 ---
 
-## 10. Robot state・外部sensorを追加する場合
+## 10. 外部sensorを追加する場合
 
-baselineは14Dのrobot state/actionと4 RGB cameraを対象とする。追加のrobot stateや外部sensorを利用する場合は、baselineを直接書き換えて情報を不可逆に落とすのではなく、sensorの更新周期・timestamp・interfaceに応じた取得方法を選択する。
+baselineは14Dのrobot state/actionと4 RGB cameraを対象とする。
 
-本成果物では、標準的な考え方を以下とする。
+camera、F/T、IMU、tactile sensor等の追加方法は [03 Architecture and Extension](03_architecture_and_extension.md) を正とする。
 
-- robot/control rateとsensor acquisition rateを分離して考える
-- RGB camera等、LeRobotのrecording rateと自然に一致するdeviceは直接統合を検討する
-- 高周期F/T sensorや異なるFPSのtactile camera等はnative / actual rateで独立取得し、timestampを保持する
-- raw streamを保存し、policy用の同期表現は後処理で生成する
-- 同期にはfuture sampleを使用しないcausal alignmentを基本とする
-- より厳密な同期が必要なtaskではhardware trigger / shared clock等を検討する
+基本方針:
 
-外部sensorの取得・同期方法、設計理由、実機検証例は以下を参照する。
+- robot FPS程度で1値/1frameが必要なsensorはLeRobot observationへの直接統合を検討する
+- 高周期numeric sensorはnative / actual rateで保存する
+- robot FPSと異なるcameraはnative streamとtimestampを保存する
+- robot/control rate、sensor acquisition rate、policy inference rateを分離する
+- raw data + timestampをcanonicalとする
+- policy用の同期表現はderived dataとして生成する
+- causal alignmentではfuture sample/frameを使用しない
+- stricter synchronizationが必要なtaskではhardware trigger / shared clock / PTP等を設計する
 
-- [03 Architecture and Extension](03_architecture_and_extension.md)
-- [Custom Sensor Example](../examples/custom_sensor/README.md)
-- [06 Validation Results](06_validation_results.md)
-
-ここで示すbaseline Datasetを変更する場合は、変更後のschemaを必ず記録し、`validate_dataset.sh` または対象schemaに対応するvalidatorで保存結果を確認する。
+reference implementationの実行方法は [Custom Sensor Reference](../examples/custom_sensor/README.md)、実機検証結果は [06 Validation Results](06_validation_results.md) を参照する。
 
 ---
 
 ## 11. Dataset収録時に残す情報
 
-再現性のため、実験datasetを作成するときは少なくとも以下を記録する。
+実験datasetごとに少なくとも以下を記録する。
 
 - 使用した本repositoryのcommit
 - `lerobot_trossen` のcommit
@@ -674,60 +540,52 @@ baselineは14Dのrobot state/actionと4 RGB cameraを対象とする。追加の
 - episode数
 - episode時間
 - camera構成
-- Arm / sensor構成に標準設定からの変更があるか
+- Arm / sensor構成にbaselineからの変更があるか
 - recording中に発生したwarning / error
 - dataset validation結果
 
-hardware構成やsoftware versionを変更した場合は、その変更内容も記録する。
-
-実機固有のIP addressやserial numberを公開repositoryへ記録する必要はない。必要な場合はmachine-localな実験記録として管理する。
+machine-specific identifierが必要な場合はlocalな実験記録として管理する。
 
 ---
 
 ## 12. Baseline完了条件
-
-初回環境の動作確認は次をすべて満たした時点で完了とする。
 
 ```text
 [ ] repository obtained
 [ ] setup completed
 [ ] Arm IPとphysical roleの対応を確認
 [ ] RealSense serialとphysical roleの対応を確認
-[ ] local configs completed
+[ ] hardware-local.yaml completed
 [ ] hardware check -> READY
 [ ] teleoperation visually verified
 [ ] recording completed
 [ ] dataset validation -> PASS
 ```
 
-この一連の確認により、「packageがinstallできた」「Armがpingへ応答した」といった部分確認だけではなく、実際にLeader-Follower操作を行い、cameraを含む学習用Datasetが生成・検証されるところまでを確認する。
-
-実機検証済みschema、frame数、取得rate等の結果は [06 Validation Results](06_validation_results.md) に記載する。
+この条件を満たした時点で、baseline data collection environmentの動作確認完了とする。
 
 ---
 
-## 13. 次に行うこと
+## 13. 次に読む資料
 
-Baseline収録だけが目的ならここで完了である。
-
-外部sensorを追加する場合:
+外部sensorを追加する:
 
 - [03 Architecture and Extension](03_architecture_and_extension.md)
-- [Custom Sensor Example](../examples/custom_sensor/README.md)
+- [Custom Sensor Reference](../examples/custom_sensor/README.md)
 
-versionやhardwareを更新する場合:
+versionやhardwareを更新する:
 
 - [05 Maintenance](05_maintenance.md)
 
-問題が発生した場合:
+問題を切り分ける:
 
 - [04 Troubleshooting](04_troubleshooting.md)
 
-採用したsoftware stackと他方式との使い分けを確認する場合:
+採用stackを確認する:
 
 - [01 Reference Stack](01_reference_stack.md)
 
-実機でどこまで確認済みかを確認する場合:
+実機検証結果を確認する:
 
 - [06 Validation Results](06_validation_results.md)
 

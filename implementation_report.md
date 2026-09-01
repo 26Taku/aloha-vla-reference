@@ -1,20 +1,18 @@
-# Phase 1 Implementation Report
+# Implementation Report
 
 ## 1. この文書の役割
 
-本書はPhase 1で行った**調査、選定、実装、実機検証、残課題**を納品者・レビュー者向けに要約する。
+本書は、本reference作成で行った**調査、選定、実装、実機検証、制約**を納品・レビュー向けに要約する。
 
-利用者向けの操作マニュアルではない。初回利用手順は `docs/02_data_collection.md`、実機検証の詳細数値は `docs/06_validation_results.md` を正とする。
+利用者向けの操作マニュアルは `docs/02_data_collection.md`、sensor extension設計は `docs/03_architecture_and_extension.md`、実機検証結果は `docs/06_validation_results.md` を参照する。
 
 ## 2. 目的
 
-ALOHAについて、初見の利用者が環境構築からteleoperation、実データ収録まで再現でき、今後のVLA案件でsoftware構成・sensor extension方法を毎回ゼロから調査しなくて済むreferenceを作成した。
+ALOHAについて、初見の利用者が環境構築からteleoperation、実データ収録まで再現でき、今後のVLA・模倣学習案件でsoftware構成やsensor extension方法を毎回ゼロから調査しなくて済むreferenceを作成した。
 
-Phase 1の主対象はdata collection stackであり、model training / inferenceはPhase 2の対象とする。
+対象はdata collectionとsensor extensionである。model training / inferenceは本成果物の対象外とする。
 
 ## 3. 採用baseline
-
-標準構成にはTrossen Robotics公式 `lerobot_trossen` pluginを採用し、実機検証済みcommitを固定した。
 
 ```text
 TrossenRobotics/lerobot_trossen
@@ -29,15 +27,13 @@ LeRobotDataset v3.0
 - Trossen AI seriesのhardware integrationがTrossen公式として提供される
 - leader-follower teleoperation、robot state/action、複数camera、LeRobotDataset recordingを同一stackで扱える
 - LeRobot系policyへの接続点が明確
-- 研究室固有forkをbaselineに依存させずに済む
+- project-specific forkとbaselineを分離できる
 
-既存研究forkは変更せず、clean environmentでreference stackを検証した。
+選定理由の詳細は `docs/01_reference_stack.md` に記載する。
 
-選定理由の詳細は `docs/01_reference_stack.md` に記載した。
+## 4. Baseline data collectionの実装
 
-## 4. 実装成果物
-
-Baseline workflow:
+整理したwrapper / checker:
 
 ```text
 setup.sh
@@ -47,98 +43,205 @@ record.sh
 validate_dataset.sh
 ```
 
-Hardware固有値はtracked configへ入れず、templateからGit管理外のlocal configを作る方式にした。
+役割:
+
+- `setup.sh`: upstream取得、verified commit固定、dependency setup
+- `check_hardware.sh`: hardware config、Arm reachability、RealSense、software version、storageを事前確認
+- `teleoperate.sh`: teleoperation用runtime configを生成して起動
+- `record.sh`: recording用runtime configを生成し、task / episode条件を指定してLeRobotDatasetを収録
+- `validate_dataset.sh`: metadata、Parquet、schema、videoを検証
+
+## 5. Hardware configurationの一元化
+
+machine-specific hardware identityは1つのGit管理外fileに集約した。
 
 ```text
-config/teleop-template.yaml -> config/teleop-local.yaml
-config/record-template.yaml -> config/record-local.yaml
+config/hardware-local.yaml
 ```
 
-これにより、public repositoryへArm IPやcamera serialを埋め込まず、利用者が対象hardwareを確認する工程を初回手順に含めた。
-
-External sensor reference:
-
-- robot frame host timestamp sidecar
-- generic ROS 2 numeric/time-series logger
-- causal latest-sample alignment
-- causal history-window manifest
-- asynchronous V4L2 camera timestamp extraction / alignment
-
-## 5. Sensor architectureの選定
-
-外部sensorをすべてLeRobot observationへ直接追加する方法、ROS 2 sidecarを標準化する方法等を比較した。
-
-最終的にはtransportを固定せず、次を標準原則とした。
+tracked file:
 
 ```text
-acquisition rate != robot rate != policy rate
+config/hardware-template.yaml
+config/teleop-template.yaml
+config/record-template.yaml
+scripts/build_runtime_config.py
+```
+
+役割:
+
+```text
+hardware-local.yaml
+    4 Arm IP + 4 RealSense serial
+
+teleop-template.yaml
+    teleoperation固有設定
+
+record-template.yaml
+    recording固有設定
+
+build_runtime_config.py
+    hardware identityを用途別templateへ注入
+```
+
+各wrapperは `.runtime/` 以下へcomplete LeRobot configを生成する。
+
+この構成により、同じArm IP / camera serialをteleoperation用とrecording用の2ファイルへ重複入力する必要がなくなった。camera serialはruntime生成時に文字列へ正規化する。
+
+## 6. Hardware identification
+
+Arm:
+
+```text
+PC network確認
+    ↓
+trossen-arm discover
+    ↓
+trossen-arm identify --ip ...
+    ↓
+physical Armとの対応確定
+```
+
+RealSense:
+
+```text
+lerobot-find-cameras realsense
+    ↓
+serialごとの画像保存
+    ↓
+physical camera roleとの対応確定
+```
+
+fresh checkoutからこの経路を実機で確認した。
+
+## 7. Teleoperation safety
+
+実機検証で、Leaderが操作可能になってからFollower追従loop開始まで短い時間差が生じる場合があることを確認した。
+
+追従開始前にLeaderを大きく移動した試行では、追従開始時にFollowerがLeaderの現在姿勢へ急速に移動し、joint velocity limitで停止した。
+
+利用者向け手順には、teleoperation起動直後はLeaderを保持し、小さな動きへFollowerが連続追従することを確認してから通常操作を開始する手順を追加した。
+
+また、error停止姿勢からControllerの電源を切ると保持力が失われArmが落下するため、power cycle前にArmを支持する安全手順を `docs/02_data_collection.md` と `docs/04_troubleshooting.md` に記載した。
+
+## 8. Sensor extensionで解決する問題
+
+外部sensor追加では、次を扱う必要がある。
+
+- sensorごとのnative / actual rate
+- robot/control rateとpolicy inference rate
+- ROS 2、V4L2、vendor SDK等のinterface
+- source/device clockとhost clock
+- high-rate raw dynamicsの保持
+- robot frameとのcausal alignment
+
+本referenceでは次を共通境界とする。
+
+```text
+sensor acquisition rate != robot/control rate != policy rate
 
 raw data + real timestamp          = canonical
 policy-specific synchronized view = derived
 ```
 
-F/T、tactile camera、RGB cameraではnative rateとinterfaceが異なる。すべてを30 Hz robot loopへ同期取得するとraw dynamicsの喪失やcontrol loopへの負荷につながるためである。
+## 9. Sensor architecture
 
-設計の詳細は `docs/03_architecture_and_extension.md` に記載した。
+### LeRobot observationへの直接統合
 
-## 6. GelSight code provenance
+robot FPS程度で取得でき、robot frameごとに1値/1frameで十分なsensorに使用する。
 
-研究室で使用されていたGelSight helperには、GelSight Inc.公式 `gelsightinc/gsrobotics` のOpenCV based `GelSightMini`構造に対応する部分があり、その上にproject-specific変更が加わっていた。
+### Native-rate numeric sidecar
 
-研究室のROS 2 publisherはそのhelperを利用するwrapperだが、確認したfileだけから元repositoryまでは特定できなかった。このためTrossen公式codeやGelSight公式標準codeとは表記しない。
+F/T、IMU等の高周期numeric streamをnative / actual rateで保存し、robot timestampからcausal latest-valueまたはhistory-windowを生成する。
 
-Phase 1で作成したfull-resolution JPEG-per-frame comparison prototypeの結果は、本Phase 1内の実装比較としてのみ扱う。研究室既存codeやGelSight公式codeの性能評価ではない。
+### Asynchronous camera
 
-最終referenceには研究室側GelSight sourceをコピーせず、V4L2/FFmpeg + timestamp alignmentという独立した汎用経路のみを含めた。
+robot FPSと異なるcameraをnative compressed streamで保存し、frame/packet timestampからcausal latest-frame mappingを生成する。
 
-## 7. 実機検証の要約
+### Hardware synchronization
 
-Baseline:
+software timestampで不足するtaskではhardware trigger、共有clock、PTP等を対象hardwareに合わせて設計する。
 
-- clean setup: PASS
-- bimanual teleoperation: PASS
-- RealSense 4-view recording: PASS
-- LeRobotDataset v3: PASS
-- wrapper recording / validator: PASS
-- Trossen external effort state propagation: PASS
+詳細は `docs/03_architecture_and_extension.md` に記載する。
 
-External sensor architecture:
+## 10. External sensor reference implementation
 
-- high-rate numeric stream native acquisition: PASS
-- robot/sensor causal alignment: PASS
-- history-window generation: PASS
-- asynchronous GelSight native compressed acquisition: PASS
-- robot/camera causal alignment: PASS
+- `record_with_timestamps.py`: robot frame host timestamp sidecar
+- `ros2_timeseries_logger.py`: generic numeric/time-series acquisition
+- `align_timeseries.py`: causal latest-sample alignment
+- `validate_alignment.py`: causality / missing / age等の検証
+- `build_sensor_windows.py`: causal history-window manifest
+- `extract_mkv_timestamps.py`: asynchronous camera packet timestamp export
+- `align_camera_frames.py`: causal latest-frame alignment
 
-詳細なframe数、rate、age distribution等は `docs/06_validation_results.md` に集約した。
+実行方法は `examples/custom_sensor/README.md` に記載する。
 
-## 8. 制約
+## 11. Sensor architecture validation
 
-Phase 1のsoftware synchronizationは同一host monotonic clockを基準とし、hardware triggerやsub-millisecond synchronizationを保証しない。
+### High-rate numeric stream
 
-GelSightは1台でarchitecture validationを行った。2台同時利用時のthroughputは未検証であり、2台を標準搭載する案件ではcapacity testを追加する。
+```text
+native-rate acquisition
++ concurrent ALOHA recording
++ robot frame timestamp
++ causal latest-sample alignment
++ history-window generation
+```
 
-外部sensorをpolicyへどのようにencodeするか、VLAをどのruntimeでtraining / inferenceするかはPhase 2の設計事項とする。
+まで実機確認した。
 
-## 9. 保守方針
+### Asynchronous camera
 
-本成果物は検証済みrevisionを固定する。
+GelSight Mini 1台で、
 
-Trossen / LeRobot / hardware / Dataset schemaを変更した場合は `docs/05_maintenance.md` に従い、`docs/02_data_collection.md` のacceptance pathを再実行する。
+```text
+V4L2 MJPEG native compressed acquisition
++ packet timestamp保持
++ concurrent ALOHA recording
++ causal latest-frame alignment
+```
 
-特にrobot frame timestamp referenceはLeRobot 0.6.0のrecord loopに依存するため、upstream更新時にはsource diffと再validationを必須とする。
+まで確認した。
 
-## 10. 納品時の最終確認
+実測値は `docs/06_validation_results.md` に集約する。
 
-最終提出commitをclean checkoutし、`docs/02_data_collection.md` の正式手順だけで以下を通す。
+## 12. GelSight code provenance
+
+確認したGelSight関連codeを次のように区別した。
+
+- GelSight Inc.公式 `gelsightinc/gsrobotics`: GelSight Mini用OpenCV based SDK / demo
+- project-specific helper: 公式構造をベースに変更されたもの
+- project-specific ROS 2 publisher: helperを利用するwrapper
+- 本repositoryのcamera reference: V4L2/FFmpeg + timestamp alignmentとして独立実装
+
+本repositoryへvendor / upstream sourceをコピーする場合はlicenseと出典を確認する。
+
+## 13. End-to-end validation
+
+fresh cloneから、
 
 ```text
 setup
--> hardware identification / local configuration
+-> hardware identification
+-> hardware-local.yaml
 -> hardware check
 -> teleoperation
 -> recording
 -> dataset validation
 ```
 
-最終結果は `docs/06_validation_results.md` のFinal delivery acceptanceへ記録する。
+を通した。
+
+hardware configuration一元化後にも同じpathを再実行し、hardware check、teleoperation、one-episode recording、dataset validationまで完了した。
+
+## 14. 制約
+
+software synchronizationは同一host monotonic clockを基準とする。hardware-trigger levelの同期、sub-millisecond synchronization、複数PC間clock synchronizationは別途設計が必要である。
+
+GelSight 2台同時使用時のcapacity、外部sensorをpolicyへencodeする具体方式、VLA training / inference runtimeは本成果物では固定しない。
+
+## 15. 保守方針
+
+Trossen / LeRobot / hardware / Dataset schemaを変更した場合は `docs/05_maintenance.md` に従ってacceptance pathを再実行する。
+
+robot frame timestamp referenceはLeRobot 0.6.0のrecord loopに依存するため、upstream更新時にはsource diffと再validationを行う。

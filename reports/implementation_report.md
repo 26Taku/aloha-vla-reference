@@ -6,6 +6,8 @@
 
 利用者向けのbaseline操作は `docs/02_data_collection.md`、sensor extensionのend-to-end操作・設計は `docs/03_architecture_and_extension.md`、実測値は `docs/06_validation_results.md` を正とする。
 
+利用者向け資料は、前提知識がない配属直後の学生が概念を学びながら作業できるよう、`docs/00_concepts_and_terminology.md`を入口とする教材構成へ改訂した。01〜05では用語の役割、作業目的、判断理由、成功条件を実際に使う箇所でも再説明する。06は操作手順ではなく、記載内容を実機で確認した証跡として位置づける。
+
 ---
 
 ## 2. 目的
@@ -245,4 +247,16 @@ generated/runtime/data artifact exclusion check
 fresh clone / setup static path check
 ```
 
-Final commitとrelease check結果は`docs/06_validation_results.md`のDelivery acceptance statusへ記録する。
+教材化revisionでは、さらに以下を確認する。
+
+```text
+READMEのStart hereから00へ最初に到達できる
+00から01 -> 02へ学習順序がつながる
+02冒頭でteleoperation、達成目標、物理接続を説明する
+03を具体的なsensor追加例から開始し、方式選択まで導く
+06を利用者が自分の結果を比較・判断できる構成にする
+納品・review向けの説明を教材本文へ混在させない
+相対linkとMarkdown code fenceが壊れていない
+```
+
+Final commitとrelease check結果は、本reportまたはrelease logへ記録する。利用者向けの`docs/06_validation_results.md`には納品確認を混在させない。

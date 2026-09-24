@@ -1,6 +1,6 @@
 # Custom Sensor Script Reference
 
-このdirectoryは、[03 Architecture and Sensor Extension](../../docs/03_architecture_and_extension.md) で使用するreference scriptを提供する。
+このdirectoryは、[03 外部センサを追加する](../../docs/03_architecture_and_extension.md)で使用するscriptのCLIと入出力仕様をまとめる。
 
 **新しいsensorを追加するときの実行順序は03を参照する。**  
 本資料はscriptごとのCLI、input、outputを確認するときに使用する。

@@ -1,10 +1,38 @@
-# Troubleshooting
+# 04 問題を切り分ける
 
 ## 1. この資料の役割
 
-本資料は、通常フローが途中で止まったときの症状別切り分けを扱う。
+この章は、通常フローが途中で止まったときに、原因がありそうな層を一つずつ調べるために使う。
 
-通常の実行順序は [02 Data Collection](02_data_collection.md) を参照する。
+通常の実行順序は[02 最初のデータを収録する](02_data_collection.md)を参照する。
+
+Troubleshootingでは、error messageだけを検索する前に「どの層まで正常か」を確認する。
+
+```mermaid
+flowchart TD
+    A["電源・cable・network / USB"] --> B["OSからdeviceが見えるか"]
+    B --> C["Driverからdataが出るか"]
+    C --> D["LeRobotが接続できるか"]
+    D --> E["収録とDataset検証が通るか"]
+```
+
+上から順に確認すると、例えば「RealSenseがUSB deviceとして見えない問題」と「serialを誤ってconfigへ書いた問題」を分けられる。症状を記録するときは、実行command、最初のerror、直前に変更したもの、再現条件を残す。
+
+安全に関わるArm errorでは、原因調査より先に周囲の安全、保持状態、落下経路を確認する。
+
+### 症状から探す
+
+| 症状 | 最初に読む節 |
+|---|---|
+| Setupが終了しない | [2. `setup.sh`が失敗する](#2-setupsh-が失敗する) |
+| Local configのerror | [3](#3-hardware-localyaml-がない)、[4](#4-replace_with-が残っている) |
+| Armが見えない | [5. Arm Controllerが見つからない](#5-arm-controllerが見つからない) |
+| Cameraが見えない | [6. RealSenseが認識されない](#6-realsenseが認識されない--configured-serialが見つからない) |
+| Armが急停止した | [7. Joint limit](#7-teleoperationが-joint-limit-exceeded-で停止する) |
+| Dataset名のerror | [9. Dataset directory already exists](#9-dataset-directory-already-exists) |
+| Frame数・rateが想定と違う | [10](#10-frame数が-duration-x-fps-と完全一致しない)、[13](#13-sensorの実測rateが想定と違う) |
+| ROS 2 sensorが0 sample | [11. ROS 2 logger](#11-外部ros-2-sensor-loggerが0-sample) |
+| 非同期cameraの保存・同期 | [14〜18](#14-gelsightのadvertised-fpsと実測fpsが違う) |
 
 ## 2. `setup.sh` が失敗する
 
@@ -31,7 +59,7 @@ git -C lerobot_trossen status --short
 cp config/hardware-template.yaml config/hardware-local.yaml
 ```
 
-[02 Data Collection](02_data_collection.md#4-hardware-identification--local-configuration) に従って4 ArmのIPと4 RealSenseのserialを設定する。
+[02のStep 4](02_data_collection.md)に従って4 ArmのIPと4 RealSenseのserialを設定する。
 
 ## 4. `REPLACE_WITH_...` が残っている
 
@@ -186,19 +214,19 @@ project-specific local configには安定したdevice identifierを使用する�
 
 driver設定・timer・device modeと実測rateを確認する。
 
-frame/sample countとtimestampからactual rateを計算する。reference validationの結果は [06 Validation Results](06_validation_results.md) を参照する。
+frame/sample countとtimestampからactual rateを計算する。比較値は[06 実機検証結果と正常性の判断](06_validation_results.md)を参照する。
 
 ## 14. GelSightのadvertised FPSと実測FPSが違う
 
 frame count / timestampからactual capture rateを確認する。
 
-reference validationの実測例は [06 Validation Results](06_validation_results.md) を参照する。
+実測例は[06 実機検証結果と正常性の判断](06_validation_results.md)を参照する。
 
 ## 15. camera保存でrateが大きく低下する
 
 capture pathでdecode、resize、JPEG再encode、per-frame file I/Oを行っていないか確認する。
 
-asynchronous camera referenceではnative compressed streamを保存する。詳細は [03 Architecture and Extension](03_architecture_and_extension.md) を参照する。
+asynchronous camera referenceではnative compressed streamを保存する。考え方は[03 外部センサを追加する](03_architecture_and_extension.md)を参照する。
 
 ## 16. `ffmpeg -copyts` でoutputがemptyになる
 
@@ -235,4 +263,4 @@ raw imageは複製せずmappingを保存する。
 
 source/device timestampとhost `CLOCK_MONOTONIC` のclock domainを確認する。
 
-本referenceのsoftware alignmentではhost monotonic timestampを基準とする。別hardware / driverへ変更した場合は対象timestampのsemanticsを確認する。
+ここで扱うsoftware alignmentではhost monotonic timestampを基準とする。別hardware / driverへ変更した場合は対象timestampのsemanticsを確認する。

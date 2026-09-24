@@ -2,7 +2,7 @@
 
 この資料は、Linux V4L2で認識されるasynchronous cameraをnative compressed streamとして保存する際の実装詳細をまとめる。
 
-end-to-endの作業順序は [03 Architecture and Sensor Extension](../../../docs/03_architecture_and_extension.md) のPattern Cを参照する。
+End-to-endの作業順序は[03 外部センサを追加する](../../../docs/03_architecture_and_extension.md)のPattern Cを参照する。
 
 reference path:
 

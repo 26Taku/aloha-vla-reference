@@ -1,130 +1,126 @@
-# ALOHA VLA Data Collection Reference
+# ALOHAではじめるロボットデータ収集
 
-ALOHAでVLA・模倣学習向けデータ収集を始め、camera・F/T・tactile等の追加sensorへ拡張するためのreference repositoryです。
+この教材では、組み立て済みのALOHAを使って、次の一連の作業を学びます。
 
-Trossen Robotics公式 `lerobot_trossen` をbaselineとして、環境構築、hardware identification、teleoperation、LeRobotDataset収録、dataset validationまでを一つの再現可能な流れとして整理しています。加えて、取得周期やinterfaceが異なる外部sensorを追加するための設計原則、timestamp、同期、reference implementationを提供します。
-
-## Start here
-
-目的に応じて、最初に読む資料を選びます。
-
-- **ALOHAを初めてセットアップしてDatasetを収録したい**  
-  → [docs/02_data_collection.md](docs/02_data_collection.md) を上から順に実行する
-- **camera / F/T / tactile等のsensorを追加したい**  
-  → baselineを一度動作確認した後、[docs/03_architecture_and_extension.md](docs/03_architecture_and_extension.md) を上から実行する
-
-通常の初回利用フロー:
-
-```text
-Repository取得
-    ↓
-Environment setup
-    ↓
-Hardware identification
-    ↓
-hardware-local.yaml 作成
-    ↓
-Hardware check
-    ↓
-Teleoperation
-    ↓
-Recording
-    ↓
-Dataset validation
+```mermaid
+flowchart TD
+    A["人がロボットを操作"] --> B["画像と動きを記録"]
+    B --> C["Datasetとして保存"]
+    C --> D["保存内容を検証"]
 ```
 
-途中で問題が発生した場合は [docs/04_troubleshooting.md](docs/04_troubleshooting.md) を参照してください。
+想定読者は、研究室へ配属されて初めてロボットを扱う学生です。ロボット、ALOHA、LeRobot、ROS 2を知っている必要はありません。Linuxのターミナルでコマンドを実行した経験が少しあれば始められます。
 
-## このrepositoryが提供する2つのreference
+本教材が扱うのは、組み立て完了後のsoftware環境構築、Teleoperation、データ収集、および外部sensorの追加です。Armやcameraの取り付けなど、ハードウェアの組み立て作業は対象に含みません。
 
-### 1. Reproducible ALOHA data collection
+## 最初にすること
 
-- Trossen公式LeRobot pluginの検証済みrevisionを再現
-- Bimanual leader-follower teleoperation
-- RealSense 4視点を含むLeRobotDataset v3 recording
-- dataset metadata / Parquet / videoのvalidation
-- machine-specific hardware identityを1つのlocal configで管理
-- fresh cloneからDataset validationまでのend-to-end確認手順
+### 1. ALOHAの組み立て状態と部品構成を確認する
 
-詳細操作は [02 Data Collection](docs/02_data_collection.md) に一本化しています。
+ALOHAがまだ組み立てられていない場合や、機器の配置・配線を確認したい場合は、最初にTrossen Robotics公式のHardware Setupを参照してください。
 
-### 2. Sensor extension reference
+- [Trossen Robotics: Hardware Setup](https://docs.trossenrobotics.com/trossen_arm/main/getting_started/hardware_setup.html)
 
-- 新しいsensorをLeRobotへ直接統合するか、独立streamとして取得するかのdecision guide
-- robot frameへのhost monotonic timestamp付与
-- 高周期numeric sensorのnative-rate保存
-- asynchronous cameraのnative compressed保存
-- robot/sensor間のcausal alignment
-- current-value / history-window等のderived representation
-- software synchronizationとhardware synchronizationの境界
+実機を見ながら、次の部品が揃っていることを確認してください。
 
-sensor追加のend-to-end手順は [03 Architecture and Extension](docs/03_architecture_and_extension.md)、各reference scriptのCLI / input / output仕様は [examples/custom_sensor/README.md](examples/custom_sensor/README.md) を参照してください。
+- 人が手で動かす2台のLeader Arm
+- 対象物を操作する2台のFollower Arm
+- 各ArmにつながるArm Controller
+- 4台のControllerをPCにつなぐEthernet switch
+- 上方、低位置、左右手首の4台のcamera
 
-外部sensorを使用しない場合は、baseline data collectionだけで完結します。
+それぞれの部品の役割や、人が操作するLeader Armと対象物を操作するFollower Armの関係は、次の00で説明します。
 
-## Documentation map
+すでに組み立てが完了している場合は、Hardware Setupを最初から実行する必要はありません。部品構成を確認したら、00へ進んでください。
 
-| 読みたい内容 | 資料 | 役割 |
+### 2. 00から順に読む
+
+初めての人は、次の順序で進んでください。
+
+| 順番 | 教材 | 読み終えたときにできること |
 |---|---|---|
-| 初回セットアップから収録完了まで進めたい | [02 Data Collection](docs/02_data_collection.md) | **baselineの唯一の詳細操作マニュアル** |
-| camera / F/T / tactile等を追加したい | [03 Architecture and Extension](docs/03_architecture_and_extension.md) | **sensor extensionのend-to-end操作・設計マニュアル** |
-| sensor reference scriptのoptionや入出力を確認したい | [Custom Sensor Script Reference](examples/custom_sensor/README.md) | scriptのCLI / input / output仕様 |
-| なぜこのsoftware stackを採用したか知りたい | [01 Reference Stack](docs/01_reference_stack.md) | baselineの選定理由・固定version・代替構成 |
-| 実行中の問題を切り分けたい | [04 Troubleshooting](docs/04_troubleshooting.md) | 症状別の確認項目と安全な復旧 |
-| hardware / LeRobot / Trossenを更新したい | [05 Maintenance](docs/05_maintenance.md) | 更新時の変更箇所・再検証条件・public化方針 |
-| どこまで実機で確認済みか知りたい | [06 Validation Results](docs/06_validation_results.md) | 実機検証結果と未検証範囲 |
-| 調査・選定・実装内容を確認したい | [Implementation Report](implementation_report.md) | 納品・実施内容の要約 |
+| 00 | [最初に知ること](docs/00_concepts_and_terminology.md) | ALOHAが何をする装置か、操作からデータ保存までを説明できる |
+| 01 | [使用するソフトウェア](docs/01_reference_stack.md) | Trossen、LeRobot、`lerobot_trossen`の役割を区別できる |
+| 02 | [最初のデータ収集](docs/02_data_collection.md) | 実機を確認し、短いdemonstrationを1 episode収録できる |
+| 03 | [外部センサの追加](docs/03_architecture_and_extension.md) | 新しいsensorをどこへ、どのように接続するか考えられる |
 
-## Repository layout
+途中で問題が起きたら、[04 Troubleshooting](docs/04_troubleshooting.md)を使います。softwareやhardwareを変更するときは[05 Maintenance](docs/05_maintenance.md)、この構成で実際に確認済みの値や挙動を知りたいときは[06 実機検証結果と正常性の判断](docs/06_validation_results.md)を参照してください。
 
-```text
-.
-├── README.md
-├── setup.sh
-├── check_hardware.sh
-├── teleoperate.sh
-├── record.sh
-├── validate_dataset.sh
-├── config/
-│   ├── hardware-template.yaml
-│   ├── teleop-template.yaml
-│   └── record-template.yaml
-├── scripts/
-│   └── build_runtime_config.py
-├── examples/
-│   └── custom_sensor/
-├── docs/
-│   ├── 01_reference_stack.md
-│   ├── 02_data_collection.md
-│   ├── 03_architecture_and_extension.md
-│   ├── 04_troubleshooting.md
-│   ├── 05_maintenance.md
-│   └── 06_validation_results.md
-└── implementation_report.md
-```
+## この教材の読み方
 
-初回利用時は `config/hardware-template.yaml` からGit管理外の `config/hardware-local.yaml` を作成します。Arm IP addressとcamera serial number等のmachine-specific identifierは、このlocal fileだけに設定します。
+本文には3種類の情報があります。
 
-`teleop-template.yaml` と `record-template.yaml` は、camera FPS等の用途別設定を保持します。各wrapperは実行時にhardware identityとtemplateを合成し、`.runtime/` 以下へLeRobot用configを生成します。
+### やること
 
-## Reference baseline
+利用者が実際に行う操作です。コマンドを実行する前に、その節の「何を確認するか」を読んでください。
 
-実機検証したbaseline:
+### 仕組み
+
+今行った操作が、システムのどの部分に働いているかを説明します。最初は完全に理解できなくても構いません。
+
+### 完了条件
+
+次へ進んでよい状態を示します。コマンドが終了したことだけでなく、表示や実機の動きを確認します。
+
+分からない用語をすべて調べてから進む必要はありません。具体的な作業の中で一度使い、その後に説明へ戻る方が理解しやすい構成になっています。
+
+## 最初の到達点
+
+最初の目標は、例えば次の10秒程度の作業を記録することです。
+
+> 左右のLeader Armを使い、Follower Armでblockを持ち上げ、隣のtrayへ置く。
+
+収録後、以下が一つのepisodeとして保存されます。
+
+保存されるのは、4台のcamera画像、左右Follower Armの状態、人が与えた操作指令、task名と時刻情報である。
+
+最後にvalidatorを実行し、数値data、video、metadataが対応していることを確認します。ここまで通れば、ALOHAの基本的なdata collectionの全体像を実体験したことになります。
+
+## 正常に動いているかを判断する
+
+本教材では、各作業の直後に完了条件を示します。加えて、06には検証環境で得られたframe数、control rate、sensor rate、alignment ageなどを記録しています。
+
+実測値は完全一致させる目標値ではありません。次のように使います。
+
+- 同じ10秒収録なのにframe数が極端に少ない → cameraや処理負荷を調べる
+- target 30 fpsに対して実測が大きく低い → USB帯域、decode、保存負荷を調べる
+- causal alignmentでfuture sampleが1以上 → timestampまたはalgorithmを見直す
+- validatorがPASSでも映像が遮蔽されている → demonstrationの内容を目視確認する
+
+[06 実機検証結果と正常性の判断](docs/06_validation_results.md)は、単なる実施報告ではなく、自分の環境の結果を解釈するために使用します。
+
+## 困ったときに自分で調べるための地図
+
+問題を調べるときは、まずどの層で起きているかを考えます。
+
+| 確認する層 | 問い |
+|---|---|
+| 物理 | 電源、cable、USB、Ethernetは正しいか |
+| Device | OSからArmやcameraが見えるか |
+| Driver | softwareからdataを読めるか |
+| Application | teleoperationやrecordingが動くか |
+| Data | Datasetの中身が正しいか |
+
+例えば、cameraがOSから認識されていないならLeRobotの設定だけを直しても解決しません。逆にOSからcameraが見えているなら、serial numberやrecording設定を確認します。この切り分けができるようになることを、本教材の最終的な学習目標とします。
+
+## 検証済みの構成
 
 ```text
 TrossenRobotics/lerobot_trossen
-verified commit: a4336933f34192a3daa7e9fb52674284bb5ae48e
+commit:          a4336933f34192a3daa7e9fb52674284bb5ae48e
 LeRobot:         0.6.0
 Python:          3.12
 Dataset:         LeRobotDataset v3.0
+OS:              Ubuntu 24.04
 ```
 
-この構成を採用した理由と代替構成との使い分けは [docs/01_reference_stack.md](docs/01_reference_stack.md) に記載しています。
+このversionを使う理由は01で説明します。最新版へ置き換える場合は、05に従って再検証してください。
 
-## Verification scope
+## 付属sensor toolの仕様
 
-baselineのclean setup、4 Arm identification、4 RealSense identification、single-source hardware configuration、bimanual teleoperation、LeRobotDataset v3 recording、dataset validationを実機確認しています。
+00〜06が利用者向け資料の本体であり、環境構築、収録、正常性判断に必要な説明はこの中で完結する。外部sensor用の付属scriptを実際に使用するときだけ、次のCLI仕様を参照する。
 
-外部sensorについては、高周期numeric streamとGelSight Mini 1台をtest caseとして、同一host monotonic clockによるconcurrent acquisitionとcausal alignmentまで確認しています。
+- [Custom Sensor Script Reference](examples/custom_sensor/README.md)
+- [Asynchronous Camera Reference](examples/custom_sensor/camera/README.md)
 
-hardware-trigger同期、GelSight 2台同時capacity、VLA training / inferenceは本referenceの検証範囲外です。詳細な数値は [docs/06_validation_results.md](docs/06_validation_results.md) を参照してください。
+実施内容や納品時の検証記録は`reports/`に分離しています。通常の利用者が環境構築を行うために読む必要はありません。

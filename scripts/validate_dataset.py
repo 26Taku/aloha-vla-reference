@@ -199,11 +199,35 @@ def main() -> int:
         action_type = parquet_file.schema_arrow.field("action").type
         state_type = parquet_file.schema_arrow.field("observation.state").type
 
-        if pa.types.is_fixed_size_list(action_type):
-            observed_action_dim = action_type.list_size
+        def vector_dim(column, arrow_type, expected):
+            if pa.types.is_fixed_size_list(arrow_type):
+                return arrow_type.list_size
 
-        if pa.types.is_fixed_size_list(state_type):
-            observed_state_dim = state_type.list_size
+            if pa.types.is_list(arrow_type) or pa.types.is_large_list(arrow_type):
+                values = pq.read_table(parquet_path, columns=[column])[column].combine_chunks()
+                if values.null_count:
+                    fail(f"{parquet_path.name}: {column} contains null vectors")
+                    return None
+
+                lengths = {len(value) for value in values.to_pylist() if value is not None}
+                if lengths != {expected}:
+                    fail(
+                        f"{parquet_path.name}: {column} list lengths are "
+                        f"{sorted(lengths)}; expected only {expected}"
+                    )
+                    return None
+
+                ok(f"{parquet_path.name}: {column} list vectors all have length {expected}")
+                return expected
+
+            return None
+
+        observed_action_dim = vector_dim(
+            "action", action_type, args.expected_action_dim
+        )
+        observed_state_dim = vector_dim(
+            "observation.state", state_type, args.expected_state_dim
+        )
 
         for batch in parquet_file.iter_batches(
             columns=[
@@ -258,7 +282,7 @@ def main() -> int:
                 stats["frames"] += 1
 
     if observed_action_dim == args.expected_action_dim:
-        ok(f"Parquet action type: float[{observed_action_dim}]")
+        ok(f"Parquet action vector dimension: {observed_action_dim}")
     else:
         fail(
             f"Parquet action dimension {observed_action_dim}; "
@@ -266,7 +290,7 @@ def main() -> int:
         )
 
     if observed_state_dim == args.expected_state_dim:
-        ok(f"Parquet state type: float[{observed_state_dim}]")
+        ok(f"Parquet state vector dimension: {observed_state_dim}")
     else:
         fail(
             f"Parquet state dimension {observed_state_dim}; "

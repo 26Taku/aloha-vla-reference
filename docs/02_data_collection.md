@@ -27,7 +27,7 @@ flowchart TD
 
 例えば、説明が次の場合、
 
-```bash
+```text
 uv run trossen-arm identify --ip <ARM_IP>
 ```
 
@@ -101,14 +101,31 @@ uv --version
 GitHubから取得する場合は次を実行する。
 
 ```bash
-git clone https://github.com/26Taku/aloha-vla-reference.git
+git clone https://github.com/KawaharaLab/aloha-vla-reference.git
 cd aloha-vla-reference
+source ./scripts/session.sh
 ./setup.sh
 ```
 
-ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirectoryへ移動して`./setup.sh`を実行する。
+ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirectoryへ移動して、`source ./scripts/session.sh`、`./setup.sh`の順に実行する。新しい端末では、下の「作業場所の設定」を行う。
+
+### 作業場所の設定
+
+コマンド例はUbuntuのbashを想定する。上の取得・セットアップ手順では、`source ./scripts/session.sh`で教材の場所を表す`REPO`を自動設定している。同じ端末で続ける場合は再実行不要である。
+
+新しい端末で作業を再開するときは、`README.md`と`setup.sh`がある教材のルートディレクトリへ移動し、次を実行する。教材を再取得したり、`setup.sh`を毎回実行したりする必要はない。
+
+```bash
+source ./scripts/session.sh
+```
+
+これは現在の端末にパスを用意するだけで、インストール・収録・ファイル作成は行わない。`source`は設定を現在の端末に残すために使う。以後は`cd "$REPO"`で教材ルートへ戻れる。新しい端末ではこの設定を行い直す。
+
+収録データの入力先は、データが用意できた後に[08](08_vla_training_inference.md#学習に使うデータの場所を指定する)で指定する。OpenVLA-OFT用の作業場所は、その経路を試す場合に[09](09_openvla_oft_data_bridge.md)で確認する。ここで指定する必要はない。機器のIP・serial・topic・deviceも、それぞれを使う手順で確認・入力する。
 
 ### 何が起きるか
+
+`setup.sh`はPython 3.12を明示して専用環境を用意する。対応するPythonが見つからない場合、uvの標準設定では自動ダウンロードされる。system Pythonの版を変更する必要はない。
 
 `setup.sh`はTrossen連携softwareを取得し、確認済みcommitへ合わせ、`uv`でproject専用のPython environmentを作る。詳しい役割は[01 使用するソフトウェア](01_reference_stack.md)で説明している。
 
@@ -119,6 +136,19 @@ ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirec
 - `lerobot_trossen`のcommitが`a4336933f34192a3daa7e9fb52674284bb5ae48e`である。
 
 ここで失敗した場合は[04のsetup・dependency](04_troubleshooting.md)を確認する。
+
+旧版の`setup.sh`で`The current Python version ... is not compatible with ... ==3.12.*`と出た場合だけ、`uv`がこの教材の固定版と異なるPythonを選んでいる。system Pythonを変更せず、取得済みの`lerobot_trossen`で3.12を指定してから`./setup.sh`を再実行する。
+
+```bash
+cd "$REPO/lerobot_trossen"
+uv python install 3.12
+uv sync --python 3.12 --frozen
+uv run python --version
+cd "$REPO"
+./setup.sh
+```
+
+正常にセットアップできた人には、この回復操作は不要である。Pythonの依存lockをエラー回避のために更新しない。
 
 ## Step 2: 4台のArmを見分ける
 
@@ -154,11 +184,12 @@ eno1    UP    192.168.1.1/24
 ```bash
 (
   cd lerobot_trossen
-  uv run trossen-arm identify --ip <ARM_IP>
+  read -r -p "確認するArmのIP address: " ARM_IP
+  uv run trossen-arm identify --ip "$ARM_IP"
 )
 ```
 
-`<ARM_IP>`は、`discover`で表示された実際の値へ置き換える。`identify`ではgripperが動くため、指や工具を近づけない。動いたArmを見て、次の表を自分の値で埋める。
+問いが表示されたら、`discover`で表示された実際のIPを入力する。`identify`ではgripperが動くため、指や工具を近づけない。動いたArmを見て、次の表を自分の値で埋める。
 
 | 物理的な役割 | 確認したIP address |
 |---|---|
@@ -376,7 +407,7 @@ git check-ignore -v config/hardware-local.yaml
 | `1` | episode数 |
 | `10` | 1 episodeの秒数 |
 
-収録中は、練習時と同じ安全確認を行い、急がず一つの作業を完了する。同名Datasetが既にある場合は上書きせず停止する。
+収録中は、練習時と同じ安全確認を行い、急がず一つの作業を完了する。同名Datasetが既にある場合は上書きせず停止する。1 episodeだけの場合はepisode間のresetはない。
 
 ### 何が保存されるか
 
@@ -448,6 +479,21 @@ validatorは、Dataset version、frame数、timestampの増加、action/stateの
 - versionやhardwareを変更する: [05 保守と更新](05_maintenance.md)
 - 自分の数値を実測例と比較する: [06 実機検証結果と正常性の判断](06_validation_results.md)
 - 外部sensor用scriptの引数を確認する: [Custom Sensor Script Reference](../examples/custom_sensor/README.md)
+
+### 08・09のVLA実習へ進む人：共通のデモを収録する
+
+ここまでの`first_demo`は、**機器と保存形式を確認するための1 episode**だった。続くVLA実習では、同じロボットと画角で成功したデモを少し増やし、別名の`aloha_vla_demo`として収録する。以後[08](08_vla_training_inference.md)と[09](09_openvla_oft_data_bridge.md)は、この名前を共通の入力例に使う。
+
+ブロックをトレイへ置く作業を続ける場合の実行例は次のとおり。各回を同じ状態から始め、動作が20秒以内で完了するよう練習してから開始する。作業に必要な時間が異なるなら秒数を先に決め直す。
+
+```bash
+./record.sh aloha_vla_demo "Move the block to the tray." 10 20
+./validate_dataset.sh data/aloha_vla_demo
+```
+
+episode間には`config/record-template.yaml`の`reset_time_s: 10`で10秒のreset時間を設ける。この間の操作はデモとして記録しない。収録が一回終わったら、ブロックを開始位置へ戻し、トレイを空にし、左右のLeaderとFollowerの姿勢、両グリッパの開閉を次の開始条件へ戻す。**収録ソフトがアームを自動で最初の姿勢へ戻すと仮定しない。** アームの操作可否はreset phase中の画面と実機の挙動で確認し、無理に手でFollowerを動かさない。次のepisode開始前に4視点で対象物とアームの状態を確かめる。毎回10秒で安全に戻せない場合は収録前に`reset_time_s`を延ばす（実例では15秒を使用）。収録途中で時間が不足したら、その回の開始状態を記録し、必要なら取り直す。
+
+**10 episodeは学習処理を通すための教材例で、十分な模倣性能を得るための推奨量ではない。** 各回の動画を見て、ブロックがトレイに置かれ、指示文と実演が一致することを確認する。失敗が混じった場合は元データを残し、[08のデータ選別](08_vla_training_inference.md#1-実習用データと運用時のデータ選別)を参考に採用するepisodeを判断する。同じ名前で`record.sh`を再実行すると上書きせず停止するため、追加収録は別のdataset名にする。収録を増やすより先に、最初の10回の内容を確認する。
 
 ## 11. 公式資料
 

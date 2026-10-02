@@ -22,6 +22,21 @@ causal latest-frame alignment
 
 ---
 
+## 実行例の作業場所
+
+[02の作業場所の設定](../../../docs/02_data_collection.md#作業場所の設定)を行い、`cd "$REPO"`で教材ルートへ戻る。以下の出力パスは例で、既存fileの上書きが必要な場合は新しい出力名を選ぶ。数値sensor資料と併用する場合はvideoとtimestampの設定を共通にする。
+
+```bash
+CAMERA_DIR="$REPO/data/sensor_logs"
+mkdir -p "$CAMERA_DIR"
+OUT="$CAMERA_DIR/camera.mkv"
+CAMERA_TIMESTAMP_JSONL="$CAMERA_DIR/camera_timestamps.jsonl"
+CAMERA_ALIGNMENT_JSONL="$CAMERA_DIR/camera_alignment.jsonl"
+ROBOT_FRAMES="$REPO/data/sensor_reference/meta/frame_timestamps/episode_000000.jsonl"
+```
+
+別の収録済みfileを使う場合は、例えば`read -r -p "入力MKV: " OUT`でパスを一度入力する。別Datasetのrobot timestampを使う場合も`ROBOT_FRAMES`へ同じ方法で入力する。
+
 ## 1. Prerequisites
 
 ```bash
@@ -46,11 +61,12 @@ stable symbolic linkが存在する場合:
 ls -l /dev/v4l/by-id/
 ```
 
-candidate deviceのcapability:
+一覧で見つけたdeviceを問いへ入力する。candidate deviceのcapability:
 
 ```bash
+read -r -p "Camera device（例 /dev/video6）: " DEVICE
 v4l2-ctl \
-  --device <VIDEO_DEVICE> \
+  --device "$DEVICE" \
   --all
 ```
 
@@ -58,7 +74,7 @@ format一覧:
 
 ```bash
 v4l2-ctl \
-  --device <VIDEO_DEVICE> \
+  --device "$DEVICE" \
   --list-formats-ext
 ```
 
@@ -80,15 +96,15 @@ advertised FPS
 MJPEGを提供するcameraの例:
 
 ```bash
-DEVICE=<VIDEO_DEVICE>
-OUT=<OUTPUT_MKV>
+read -r -p "Resolution（例 3280x2464）: " VIDEO_SIZE
+read -r -p "Advertised FPS: " CAMERA_FPS
 
 ffmpeg \
   -copyts \
   -f v4l2 \
   -input_format mjpeg \
-  -video_size <WIDTH>x<HEIGHT> \
-  -framerate <ADVERTISED_FPS> \
+  -video_size "$VIDEO_SIZE" \
+  -framerate "$CAMERA_FPS" \
   -timestamps default \
   -t 10 \
   -i "$DEVICE" \
@@ -99,7 +115,7 @@ ffmpeg \
   "$OUT"
 ```
 
-`<WIDTH>`, `<HEIGHT>`, `<ADVERTISED_FPS>` は `v4l2-ctl --list-formats-ext` で確認したmodeに置き換える。
+`VIDEO_SIZE`と`CAMERA_FPS`には、`v4l2-ctl --list-formats-ext`で確認したmodeを入力する。
 
 このreferenceではduration指定の `-t` を `-i` より前に置く。
 
@@ -115,7 +131,7 @@ ffprobe -v error \
   -show_entries stream=codec_name,width,height,avg_frame_rate \
   -show_entries format=duration \
   -of default=noprint_wrappers=1 \
-  <OUTPUT_MKV>
+  "$OUT"
 ```
 
 packet数とPTSを確認する場合:
@@ -125,7 +141,7 @@ ffprobe -v error \
   -select_streams v:0 \
   -show_entries packet=pts_time \
   -of csv=p=0 \
-  <OUTPUT_MKV> \
+  "$OUT" \
   | head
 ```
 
@@ -135,8 +151,8 @@ ffprobe -v error \
 
 ```bash
 python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
-  <OUTPUT_MKV> \
-  --output <TIMESTAMP_JSONL>
+  "$OUT" \
+  --output "$CAMERA_TIMESTAMP_JSONL"
 ```
 
 scriptはpacket PTSをnanosecondsへ変換し、
@@ -200,11 +216,11 @@ alignment:
 ```bash
 python3 examples/custom_sensor/camera/align_camera_frames.py \
   --robot-frames \
-    data/<DATASET>/meta/frame_timestamps/episode_000000.jsonl \
+    "$ROBOT_FRAMES" \
   --camera-timestamps \
-    <CAMERA_TIMESTAMP_JSONL> \
+    "$CAMERA_TIMESTAMP_JSONL" \
   --output \
-    <CAMERA_ALIGNMENT_JSONL>
+    "$CAMERA_ALIGNMENT_JSONL"
 ```
 
 algorithm:
@@ -254,8 +270,8 @@ advertised FPS     25
 capture:
 
 ```bash
-DEVICE=<GELSIGHT_VIDEO_DEVICE>
-OUT=data/_sensor_runs/gelsight_smoke.mkv
+read -r -p "GelSight camera device: " DEVICE
+OUT="$CAMERA_DIR/gelsight_smoke.mkv"
 
 ffmpeg \
   -copyts \

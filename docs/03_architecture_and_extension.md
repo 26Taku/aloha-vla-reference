@@ -1,5 +1,7 @@
 # 03 外部センサを追加する
 
+コマンドは教材ルートから開始する。[02の作業場所の設定](02_data_collection.md#作業場所の設定)を行い、必要に応じて`cd "$REPO"`で戻る。
+
 この章では、ALOHAへ新しいsensorを追加するときの考え方を学ぶ。対象sensorの専用manualを覚えることが目的ではない。初めて見るsensorでも、**どこまで動いていて、どこからALOHA収録へ接続すればよいか**を自分で調べられる状態を目指す。
 
 [02](02_data_collection.md)のbaseline収録が`[PASS]`になってから進む。baselineが動かない状態でsensorも同時に追加すると、問題がALOHA側かsensor側か分からなくなる。
@@ -238,9 +240,10 @@ ROS 2では、processが名前付きの**topic**へmessageをpublishし、別pro
 
 ```bash
 ros2 topic list
-ros2 topic type <SENSOR_TOPIC>
-ros2 topic echo <SENSOR_TOPIC> --once
-ros2 topic hz <SENSOR_TOPIC>
+read -r -p "確認するROS 2 topic: " SENSOR_TOPIC
+ros2 topic type "$SENSOR_TOPIC"
+ros2 topic echo "$SENSOR_TOPIC" --once
+ros2 topic hz "$SENSOR_TOPIC"
 ```
 
 例えば、調べたいtopicが`/force_torque/left`なら、実際の入力は次のようになる。
@@ -268,7 +271,8 @@ V4L2は、Linuxからcameraを扱う標準interfaceである。まずdeviceと�
 
 ```bash
 v4l2-ctl --list-devices
-v4l2-ctl --device <VIDEO_DEVICE> --list-formats-ext
+read -r -p "確認するcamera device: " DEVICE
+v4l2-ctl --device "$DEVICE" --list-formats-ext
 ```
 
 例えば一覧にGelSight Miniのcandidateとして`/dev/video6`が表示されたなら、実際の入力は次のようになる。

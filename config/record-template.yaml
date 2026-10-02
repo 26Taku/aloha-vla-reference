@@ -46,7 +46,7 @@ dataset:
   single_task: "Example task."
   fps: 30
   episode_time_s: 15
-  reset_time_s: 5
+  reset_time_s: 10
   num_episodes: 1
   video: true
   push_to_hub: false

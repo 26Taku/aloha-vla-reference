@@ -1,17 +1,19 @@
-# ALOHAではじめるロボットデータ収集
+# ALOHAではじめるロボットデータ収集とVLA
 
-この教材では、組み立て済みのALOHAを使って、次の一連の作業を学びます。
+この教材では、組み立て済みのALOHAを使い、操作・データ収集からVLAモデルの学習と推論までを学びます。機器を扱ったことのない人が公式資料を参照しながら作業を通し、その後、自分の研究目的に応じたモデルと拡張先を選べるようにします。
 
 ```mermaid
 flowchart TD
     A["人がロボットを操作"] --> B["画像と動きを記録"]
     B --> C["Datasetとして保存"]
     C --> D["保存内容を検証"]
+    D --> E["モデルを選び、学習"]
+    E --> F["チェックポイントを読み、推論"]
 ```
 
 想定読者は、研究室へ配属されて初めてロボットを扱う学生です。ロボット、ALOHA、LeRobot、ROS 2を知っている必要はありません。Linuxのターミナルでコマンドを実行した経験が少しあれば始められます。
 
-本教材が扱うのは、組み立て完了後のsoftware環境構築、Teleoperation、データ収集、および外部sensorの追加です。Armやcameraの取り付けなど、ハードウェアの組み立て作業は対象に含みません。
+本教材は組み立て完了後のsoftware環境構築、Teleoperation、データ収集、外部sensorの追加、VLAの選び方と初回学習・オフライン推論を扱います。Armやcameraの取り付けなどハードウェアの組み立ては対象に含みません。実機への学習済みpolicyの接続は公式経路と確認事項を案内しますが、この教材では学習済みpolicyによる実機閉ループ動作を検証していません。
 
 ## 最初にすること
 
@@ -41,10 +43,14 @@ ALOHAがまだ組み立てられていない場合や、機器の配置・配線
 |---|---|---|
 | 00 | [最初に知ること](docs/00_concepts_and_terminology.md) | ALOHAが何をする装置か、操作からデータ保存までを説明できる |
 | 01 | [使用するソフトウェア](docs/01_reference_stack.md) | Trossen、LeRobot、`lerobot_trossen`の役割を区別できる |
-| 02 | [最初のデータ収集](docs/02_data_collection.md) | 実機を確認し、短いdemonstrationを1 episode収録できる |
+| 02 | [最初のデータ収集](docs/02_data_collection.md) | 1 episodeで収録を確認し、08・09で共通して使う`aloha_vla_demo`を用意できる |
 | 03 | [外部センサの追加](docs/03_architecture_and_extension.md) | 新しいsensorをどこへ、どのように接続するか考えられる |
+| 07 | [VLAを選ぶための基礎と研究への入口](docs/07_vla_model_selection.md) | マルチモーダル化・VLAの改善という目的から候補と先行研究を選べる |
+| 08 | [自分のデータで学習・オフライン推論](docs/08_vla_training_inference.md) | 02で記録したデータを確認し、LeRobot版π₀.₅とSmolVLAを学習してcheckpointを読み直せる |
+| 09 | [OpenVLA-OFTへデータを渡す](docs/09_openvla_oft_data_bridge.md) | 自分の`aloha_vla_demo`から1 episodeをRLDSへ変換し、OpenVLA-OFTの学習ローダで画像・関節状態・行動列を確認できる |
+| 10 | [構成選定とセンサ拡張](docs/10_stack_decisions_and_extension.md) | 研究目的に合わせた構成の候補と、追加センサの必要性・変更範囲を整理できる |
 
-途中で問題が起きたら、[04 Troubleshooting](docs/04_troubleshooting.md)を使います。softwareやhardwareを変更するときは[05 Maintenance](docs/05_maintenance.md)、この構成で実際に確認済みの値や挙動を知りたいときは[06 実機検証結果と正常性の判断](docs/06_validation_results.md)を参照してください。
+途中で問題が起きたら[04 Troubleshooting](docs/04_troubleshooting.md)を使います。softwareやhardwareを変更するときは[05 Maintenance](docs/05_maintenance.md)、データ収集までの確認値は[06 実機検証結果と正常性の判断](docs/06_validation_results.md)を参照してください。07の第1・2節でモデルと学習経路を整理したら、08でπ₀.₅を主実習、SmolVLAを第二実習として自分のデータを使います。07の後半には、必要に応じて参照できる論文と関連モデルをまとめています。OpenVLA-OFTへのデータ接続を試したい場合は09へ進みます。09では重みの学習と実機制御は扱いません。
 
 ## この教材の読み方
 
@@ -74,11 +80,11 @@ ALOHAがまだ組み立てられていない場合や、機器の配置・配線
 
 保存されるのは、4台のcamera画像、左右Follower Armの状態、人が与えた操作指令、task名と時刻情報である。
 
-最後にvalidatorを実行し、数値data、video、metadataが対応していることを確認します。ここまで通れば、ALOHAの基本的なdata collectionの全体像を実体験したことになります。
+最後にvalidatorを実行し、数値data、video、metadataが対応していることを確認します。ここまで通れば、ALOHAの基本的なdata collectionの全体像を実体験したことになります。02の最後にVLA実習用の`aloha_vla_demo`を収録し、07で候補を選び、08で収録形式とモデルが要求する入力を照合して、短い学習、保存済みcheckpointの再読込、オフライン推論を試します。教材の短い学習はロボットのタスク成功を保証するものではありません。
 
 ## 正常に動いているかを判断する
 
-本教材では、各作業の直後に完了条件を示します。加えて、06には検証環境で得られたframe数、control rate、sensor rate、alignment ageなどを記録しています。
+本教材では、各作業の直後に完了条件を示します。06には収録環境で得られたframe数、control rate、sensor rate、alignment age、08には収録済みデータから学習・checkpoint再読込・オフライン推論を確認した条件を記録しています。学習の確認に使用したGPUは08に明記しています。
 
 実測値は完全一致させる目標値ではありません。次のように使います。
 
@@ -100,8 +106,10 @@ ALOHAがまだ組み立てられていない場合や、機器の配置・配線
 | Driver | softwareからdataを読めるか |
 | Application | teleoperationやrecordingが動くか |
 | Data | Datasetの中身が正しいか |
+| Policy | モデルの入力、正規化、action次元はデータに合うか |
+| Execution | 学習用PCのGPU・依存関係と、実機用の推論接続は合うか |
 
-例えば、cameraがOSから認識されていないならLeRobotの設定だけを直しても解決しません。逆にOSからcameraが見えているなら、serial numberやrecording設定を確認します。この切り分けができるようになることを、本教材の最終的な学習目標とします。
+例えば、cameraがOSから認識されていないならLeRobotの設定だけを直しても解決しません。逆にOSからcameraが見えているなら、serial numberやrecording設定を確認します。この切り分けを収録だけでなく学習と推論にも広げ、研究目的に合わせて次に調べる層を決められることを学習目標とします。
 
 ## 検証済みの構成
 
@@ -118,9 +126,11 @@ OS:              Ubuntu 24.04
 
 ## 付属sensor toolの仕様
 
-00〜06が利用者向け資料の本体であり、環境構築、収録、正常性判断に必要な説明はこの中で完結する。外部sensor用の付属scriptを実際に使用するときだけ、次のCLI仕様を参照する。
+00〜10が利用者向け資料の本体です。00〜06は環境構築、収録、正常性判断を扱い、07はVLAの選定、08は自分のデータからの学習とオフライン推論、09はOpenVLA-OFTへのデータ接続、10は構成選定とセンサ拡張の判断を扱います。外部sensor用の付属scriptを実際に使用するときだけ、次のCLI仕様を参照する。
 
 - [Custom Sensor Script Reference](examples/custom_sensor/README.md)
 - [Asynchronous Camera Reference](examples/custom_sensor/camera/README.md)
 
-実施内容や納品時の検証記録は`reports/`に分離しています。通常の利用者が環境構築を行うために読む必要はありません。
+## 案件に合わせて構成を選ぶ
+
+[10 構成選定とセンサ拡張](docs/10_stack_decisions_and_extension.md)は、基準構成と他の経路の違い、確認した範囲、追加センサを検討する条件をまとめています。環境構築・学習の手順は02・08・09、動作確認の条件と制約は06・08・09を参照してください。

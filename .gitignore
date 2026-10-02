@@ -27,3 +27,6 @@ logs/
 
 # Machine-specific hardware configuration (created from tracked templates)
 config/hardware-local.yaml
+
+# Upstream checkout created by setup.sh (tracked separately upstream)
+/lerobot_trossen/

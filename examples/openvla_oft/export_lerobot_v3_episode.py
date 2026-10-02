@@ -1,7 +1,7 @@
 """Export one LeRobotDataset v3 episode for the OpenVLA-OFT ALOHA RLDS builder.
 
-This is a reusable form of the one-episode conversion used in the A6000
-connection check. It does not establish physical action compatibility.
+Preserves episode observations, actions, and task metadata for data-loader
+checks. Physical action compatibility must be verified separately.
 """
 
 import argparse

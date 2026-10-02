@@ -201,7 +201,13 @@ def main() -> int:
 
         def vector_dim(column, arrow_type, expected):
             if pa.types.is_fixed_size_list(arrow_type):
-                return arrow_type.list_size
+                if arrow_type.list_size != expected:
+                    fail(
+                        f"{parquet_path.name}: {column} fixed vector dimension is "
+                        f"{arrow_type.list_size}; expected {expected}"
+                    )
+                    return None
+                return expected
 
             if pa.types.is_list(arrow_type) or pa.types.is_large_list(arrow_type):
                 values = pq.read_table(parquet_path, columns=[column])[column].combine_chunks()
@@ -220,6 +226,7 @@ def main() -> int:
                 ok(f"{parquet_path.name}: {column} list vectors all have length {expected}")
                 return expected
 
+            fail(f"{parquet_path.name}: {column} has unsupported type {arrow_type}")
             return None
 
         observed_action_dim = vector_dim(

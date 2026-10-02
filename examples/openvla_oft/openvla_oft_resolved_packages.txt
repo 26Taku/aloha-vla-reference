@@ -1,3 +1,5 @@
+# 過去の実行環境の記録。完全な再構築用lockではありません。
+# OFT本体のeditable install先は個体固有のため除外。source commitは別ファイルを参照。
 absl-py==2.5.0
 accelerate==1.15.0
 annotated-doc==0.0.5
@@ -72,7 +74,6 @@ nvidia-nvtx-cu12==12.1.105
 oauthlib==4.0.0
 openexr==3.5.1
 opentelemetry-api==1.45.0
--e file:///mnt/nvme1/tsumura/aloha/openvla_oft_candidate
 opt-einsum==3.4.0
 packaging==26.3
 peft==0.11.1

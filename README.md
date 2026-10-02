@@ -48,6 +48,7 @@ ALOHAがまだ組み立てられていない場合や、機器の配置・配線
 | 07 | [VLAを選ぶための基礎と研究への入口](docs/07_vla_model_selection.md) | マルチモーダル化・VLAの改善という目的から候補と先行研究を選べる |
 | 08 | [自分のデータで学習・オフライン推論](docs/08_vla_training_inference.md) | 02で記録したデータを確認し、LeRobot版π₀.₅とSmolVLAを学習してcheckpointを読み直せる |
 | 09 | [OpenVLA-OFTへデータを渡す](docs/09_openvla_oft_data_bridge.md) | 自分の`aloha_vla_demo`から1 episodeをRLDSへ変換し、OpenVLA-OFTの学習ローダで画像・関節状態・行動列を確認できる |
+| 10 | [構成選定とセンサ拡張](docs/10_stack_decisions_and_extension.md) | 研究目的に合わせた構成の候補と、追加センサの必要性・変更範囲を整理できる |
 
 途中で問題が起きたら[04 Troubleshooting](docs/04_troubleshooting.md)を使います。softwareやhardwareを変更するときは[05 Maintenance](docs/05_maintenance.md)、データ収集までの確認値は[06 実機検証結果と正常性の判断](docs/06_validation_results.md)を参照してください。07の第1・2節でモデルと学習経路を整理したら、08でπ₀.₅を主実習、SmolVLAを第二実習として自分のデータを使います。07の後半には、必要に応じて参照できる論文と関連モデルをまとめています。OpenVLA-OFTへのデータ接続を試したい場合は09へ進みます。09では重みの学習と実機制御は扱いません。
 
@@ -125,7 +126,11 @@ OS:              Ubuntu 24.04
 
 ## 付属sensor toolの仕様
 
-00〜09が利用者向け資料の本体です。00〜06は環境構築、収録、正常性判断を扱い、07はVLAの選定、08は自分のデータからの学習とオフライン推論、09はOpenVLA-OFTへのデータ接続を扱います。外部sensor用の付属scriptを実際に使用するときだけ、次のCLI仕様を参照する。
+00〜10が利用者向け資料の本体です。00〜06は環境構築、収録、正常性判断を扱い、07はVLAの選定、08は自分のデータからの学習とオフライン推論、09はOpenVLA-OFTへのデータ接続、10は構成選定とセンサ拡張の判断を扱います。外部sensor用の付属scriptを実際に使用するときだけ、次のCLI仕様を参照する。
 
 - [Custom Sensor Script Reference](examples/custom_sensor/README.md)
 - [Asynchronous Camera Reference](examples/custom_sensor/camera/README.md)
+
+## 案件に合わせて構成を選ぶ
+
+[10 構成選定とセンサ拡張](docs/10_stack_decisions_and_extension.md)は、基準構成と他の経路の違い、確認した範囲、追加センサを検討する条件をまとめています。環境構築・学習の手順は02・08・09、動作確認の条件と制約は06・08・09を参照してください。

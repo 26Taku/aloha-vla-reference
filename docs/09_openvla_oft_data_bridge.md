@@ -4,6 +4,8 @@
 
 この章の到達点は、**自分の`aloha_vla_demo`から1 episodeをLeRobotDataset v3から変換し、OFTの学習用ローダが3視点・14次元状態・30時刻の行動列を出すところまで**です。重みの学習や実機実行は本章に含めません。データの橋渡しを理解した後で、OpenVLA-OFT公開元の[ALOHA手順](https://github.com/moojink/openvla-oft/blob/main/ALOHA.md)と[SETUP](https://github.com/moojink/openvla-oft/blob/main/SETUP.md)を参照して先へ進んでください。
 
+> **動作確認の範囲**：付属export・builder・patchの組合せで、TFDS生成とOFTローダ読込を確認しています。環境導入から本章全手順の一括再現性は未確認です。モデルのfine-tuning・checkpoint推論・実機制御は確認していません。
+
 ## 1. なぜ変換するのか
 
 LeRobotDataset v3は画像を動画、関節状態・行動をParquet、episodeの位置をmetadataとして管理します。一方、OpenVLA-OFTのALOHA例は、ALOHA式HDF5から画像を整えた後、**RLDS**に変換し、専用の学習ローダで読みます。RLDSは「episodeの中に順序付きのstepがあり、各stepに観測・行動・言語指示を持つ」という表現です。保存済みMP4を単純に連結したり、拡張子を変えたりしてもこの対応関係は作れません。
@@ -123,7 +125,9 @@ PY
 
 ## 4. OFT側の入口を合わせる
 
-OFT側はLeRobotの`lerobot-train`とは別のPython環境です。OpenVLA-OFT公開元の[SETUP](https://github.com/moojink/openvla-oft/blob/main/SETUP.md)で作り、commit `e4287e94541f459edc4feabc4e181f537cd569a8`に固定したリポジトリへ、`examples/openvla_oft/openvla_oft_aloha.patch`を適用します。適用前に`git status`で手元の変更を確認し、同じ差分を二重適用しないでください。
+OFT側はLeRobotの`lerobot-train`とは別のPython環境です。依存条件はOpenVLA-OFT公開元の[SETUP](https://github.com/moojink/openvla-oft/blob/e4287e94541f459edc4feabc4e181f537cd569a8/SETUP.md)を参照します。公式はCondaを案内していますが、本章でローダ接続を確認したのはuvで用意した仮想環境です。以下のコマンドは、OFT用の依存が入った`$OFT/.venv/bin/python`を使う前提です。公式のConda手順だけではこのパスは作られません。Condaを選ぶ場合は実行Pythonの指定をその環境に合わせる必要があり、本章ではその経路を確認していません。
+
+commit `e4287e94541f459edc4feabc4e181f537cd569a8`に固定したリポジトリへ、`examples/openvla_oft/openvla_oft_aloha.patch`を適用します。適用前に`git status`で手元の変更を確認し、同じ差分を二重適用しないでください。
 
 ```bash
 OFT=/path/to/openvla-oft

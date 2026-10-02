@@ -4,6 +4,8 @@
 
 読み終えると、LeRobotとモデルの違いを説明し、手元のデータを学習へ渡す前に何を確かめるか判断できるようになります。
 
+構成を選ぶ際の判断材料とセンサ拡張の適用条件は[10](10_stack_decisions_and_extension.md)を参照してください。
+
 ## 基本編：実習に進む前に読む
 
 ## 1. 収録データと学習モデルの関係
@@ -91,7 +93,7 @@
 | [SmolVLA](https://arxiv.org/abs/2506.01844) ＋ [非同期推論](https://huggingface.co/docs/lerobot/main/en/async)、[RTC](https://huggingface.co/docs/lerobot/main/en/rtc) | 前者は予測と実行を分離し、後者は前後のaction chunkのつながりを扱う。**後継基盤モデルではなく推論側の拡張** | オフラインでactionが出た後、実機で計算待ちやchunk境界のぎくしゃくが問題になる場合 | 08はオフライン推論まで。固定LeRobot 0.6.0で、現行mainのRTC機能が同一に使えるとは仮定しない |
 | [π₀](https://arxiv.org/abs/2410.24164) → [π₀-FAST](https://www.pi.website/research/fast)、[π₀.₅](https://arxiv.org/abs/2504.16054) → [π*₀.₆ / RECAP](https://www.pi.website/blog/pistar06) | FASTは行動トークン化の別経路、π₀.₅は開いた環境への汎化、RECAPはデモ・自律試行・介入を使う経験からの改善 | 行動表現、事前学習の汎化、失敗後の介入データという**別々の研究目的**を選ぶ場合 | 08で行うのはLeRobot版π₀.₅の3-step。RECAPを同じCLIで実行できるという意味ではない |
 | [OpenVLA](https://proceedings.mlr.press/v270/kim25c.html) → [OpenVLA-OFT](https://arxiv.org/abs/2502.19645) | 離散action tokenを出す基盤モデルに対し、並列デコード、連続行動表現、action chunk、微調整目的を検討 | 高頻度の双腕操作やaction headの研究を始める際、**OFT研究グループが旧方式のどこを変えたか**を学べる | OFTのALOHA例は3画像＋RLDS。本教材のv3/4画像から変換が必要 |
-| [π₀](https://arxiv.org/abs/2410.24164) → [ForceVLA](https://github.com/ft-robotic/ForceVLA) | 外部グループがπ₀とopenpiを基に力覚を組み込む。**π₀.₅の直接拡張と混同しない** | 力覚を単に記録する段階から、行動生成の条件として使う研究へ進む場合 | 第一期の力覚同期はモデル入力まで通した実績ではない。独自のセンサデータ、表現と学習経路が要る |
+| [π₀](https://arxiv.org/abs/2410.24164) → [ForceVLA](https://github.com/ft-robotic/ForceVLA) | 外部グループがπ₀とopenpiを基に力覚を組み込む。**π₀.₅の直接拡張と混同しない** | 力覚を単に記録する段階から、行動生成の条件として使う研究へ進む場合 | 03・06の力覚同期はモデル入力まで通した実績ではない。独自のセンサデータ、表現と学習経路が要る |
 | [π₀.₅](https://arxiv.org/abs/2504.16054) → [OptimusVLA](https://github.com/iLearn-Lab/CVPR26-OptimusVLA) | 外部グループがπ₀.₅を起点に時間的な記憶を加える方向を検討 | 1枚の現在画像だけでは足りない長い操作や時間的整合性を研究する場合 | OptimusVLA公開コードは本教材のLeRobot移植版と同一ではない。追加依存とチェックポイントの取り扱いを確認 |
 
 **読み方の例：** 「力覚を足したい」なら、まず[03](03_architecture_and_extension.md)と[08の第4節](08_vla_training_inference.md)で収録からモデル入力までを辿ります。OpenVLA-OFTの高速化結果だけでは力覚入力の作り方は分かりません。一方、素早い双腕操作の行動列を生成したいなら、OFT研究グループが元のOpenVLAから行動の出し方を変えた理由を読み、データ変換に要する作業も確かめます。
@@ -111,7 +113,7 @@
 
 LeRobotの[Bring Your Own Hardware](https://huggingface.co/docs/lerobot/main/integrate_hardware)は、ロボットの`observation_features`と`get_observation()`の対応や、camera/robotプラグインによる観測追加の入口を説明しています。[LeRobotDataset v3](https://huggingface.co/docs/lerobot/lerobot-dataset-v3)は複数カメラと多様な時系列観測の保存・読込形式です。[Robot Processor](https://huggingface.co/docs/lerobot/implement_your_own_processor)は入力変換の拡張点です。これらは**記録・入力整形のAPI**であり、任意の力覚や触覚を既存VLAの事前学習済み重みが意味のある情報として使う標準レシピではありません。[Trossen統合の現行README](https://github.com/TrossenRobotics/lerobot_trossen)には関節effort等の収録オプションが見られますが、本教材で使用する`a4336933`に同じ機能があるかは未確認です。外付けの力覚センサとも区別してください。
 
-第一期03の収録と同期までは教材の既存経路です。モデル内の融合位置、学習目的、実機での利用は研究設計です。後者はForceVLAなどの研究グループが公開した論文・コードを**参考事例**として示し、汎用手順としての動作を保証しません。
+03の収録と同期までは教材の既存経路です。モデル内の融合位置、学習目的、実機での利用は研究設計です。後者はForceVLAなどの研究グループが公開した論文・コードを**参考事例**として示し、汎用手順としての動作を保証しません。
 
 ## 5. OpenVLA-OFTの公開実装を参照する
 
@@ -131,7 +133,7 @@ RDT、GR00T、X-VLAも公開されているVLAの例です。ここには入口�
 
 - **自然言語でタスクを切り替えたい**：SmolVLAのようなLeRobot経路でデータ・タスク文を整え、言語条件が学習と推論の双方で有効か評価する。
 - **π系モデルを使いたい**：LeRobot版π₀.₅の接続実績を基準とし、Physical Intelligenceのopenpiへ移す必要がある変更だけを特定する。移すならv3の変換試験を別途行う。
-- **力覚・触覚・高周波時系列を加えたい**：第一期03章の収集・同期設計から始める。ログに記録できることと、モデルが特徴を利用できることを分け、データ列→前処理→モデル→推論入力まで追跡する。
+- **力覚・触覚・高周波時系列を加えたい**：03章の収集・同期設計から始める。ログに記録できることと、モデルが特徴を利用できることを分け、データ列→前処理→モデル→推論入力まで追跡する。
 - **専用エコシステムを選びたい**：Isaac-GR00T等の専用実行系について、既存GPU・OS、フォーマット変換、推論接続、保守負担を含めて採用判断する。
 
 ## 7. もっと知りたい人へ：関連する非VLAと汎用方策

@@ -3,10 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TROSSEN_DIR="$ROOT_DIR/lerobot_trossen"
-HARDWARE_CONFIG="$ROOT_DIR/config/hardware-local.yaml"
 RECORD_TEMPLATE="$ROOT_DIR/config/record-template.yaml"
-RUNTIME_DIR="$ROOT_DIR/.runtime"
-RUNTIME_CONFIG="$RUNTIME_DIR/validate.yaml"
 
 if [[ $# -lt 1 ]]; then
     echo "Usage:"
@@ -28,24 +25,10 @@ if [[ ! -d "$TROSSEN_DIR" ]]; then
     exit 1
 fi
 
-if [[ ! -f "$HARDWARE_CONFIG" ]]; then
-    echo "[FAIL] Local hardware config not found:"
-    echo "       $HARDWARE_CONFIG"
-    echo "Create it with:"
-    echo "  cp config/hardware-template.yaml config/hardware-local.yaml"
-    exit 1
-fi
-
-mkdir -p "$RUNTIME_DIR"
-
+# Dataset validation needs camera feature names, not physical device identities.
 cd "$TROSSEN_DIR"
-
-uv run python "$ROOT_DIR/scripts/build_runtime_config.py" \
-    --template "$RECORD_TEMPLATE" \
-    --hardware "$HARDWARE_CONFIG" \
-    --output "$RUNTIME_CONFIG"
 
 exec uv run python "$ROOT_DIR/scripts/validate_dataset.py" \
     "$DATASET_PATH" \
-    --config "$RUNTIME_CONFIG" \
+    --config "$RECORD_TEMPLATE" \
     "$@"

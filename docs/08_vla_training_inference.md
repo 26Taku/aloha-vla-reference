@@ -4,6 +4,15 @@
 
 データは各自が[02](02_data_collection.md)で収録したものを使います。`first_demo`は収録確認用、`aloha_vla_demo`は以後の学習・推論に使うデモです。episode数は成功率の目標値ではありません。最初の3-step学習は経路の確認で、技能の獲得を測るものではありません。
 
+
+> **動作確認の範囲**：SmolVLAとLeRobot版π₀.₅は、収録済みデータによる短い学習・checkpoint再読込・オフライン推論を確認しています。環境導入から本章全手順の一括再現性は未確認です。版指定を明確化した現在のコマンドのGPU再確認も未完了です。タスク成功率と学習済みpolicyによる実機動作は評価していません。
+
+### 収録済みデータを別の学習PCで使う
+
+ロボットを接続していないGPU搭載PCでも、本章を実行できます。02のStep 1でソフトウェア環境を準備し、収録済みDatasetのディレクトリ全体をコピーするか、読める場所へ置きます。Armのdiscover・identify、teleoperationはこの学習PCでは不要です。`validate_dataset.sh`はcamera名を記録templateから読み、実機のIP・serial設定を要求しません。
+
+次の例の`/path/to/...`は、自分のリポジトリとDatasetの場所に置き換えます。収録PCと同じ絶対パスを使う必要はありません。
+
 ## まず自分のdatasetを確認する
 
 02の`./record.sh`で作成した実習用datasetを、次のように確認します。別の作業を収録した場合は、自分が付けた名前とタスク文に置き換えてください。
@@ -60,7 +69,18 @@ DATASET=/path/to/aloha-vla-reference/data/aloha_vla_demo
 
 π₀.₅の学習コマンドは[02](02_data_collection.md)で作成した`lerobot_trossen`で実行します。`DATASET`には第1節と同じ`aloha_vla_demo`を指定します。例はALOHAの4 RGB画像（424×240、30 fps）、14次元の関節状態・行動を前提にします。画像キーや次元が異なる場合は先にモデルの設定と照合してください。
 
-本教材のコマンドを確認した条件はUbuntu 22.04.5、Python 3.12、LeRobot 0.6.0、PyTorch 2.7.1+cu126、GPU 48 GBのRTX A6000です。GPU条件が異なる場合はメモリ消費を測ってください。
+学習・オフライン推論の確認に使用した条件はUbuntu 22.04.5、Python 3.12、LeRobot 0.6.0、PyTorch 2.7.1+cu126、GPU 48 GBのRTX A6000です。GPU条件が異なる場合はメモリ消費を測ってください。
+
+確認時の主要依存は以下のとおりです。これは実行環境の記録であり、全依存を再構築するlockではありません。`uv run --with`で追加した依存は基準環境と異なる場合があるため、学習・推論を実行する環境で版を確認してください。
+
+| 依存 | 確認時の版・経路 |
+|---|---|
+| LeRobot | 0.6.0 |
+| PyTorch | 2.7.1+cu126 |
+| accelerate | 1.15.0 |
+| transformers | 5.5.4（SmolVLA経路） |
+| safetensors | 0.6.2（SmolVLA経路） |
+
 
 ### 2.1 基盤重みの利用許可とログイン
 
@@ -74,14 +94,14 @@ DATASET=/path/to/aloha-vla-reference/data/aloha_vla_demo
 
 ```bash
 cd /path/to/aloha-vla-reference/lerobot_trossen
-uv run --with 'lerobot[pi]>=0.6.0' hf auth login
-uv run --with 'lerobot[pi]>=0.6.0' hf auth whoami
+uv run --with 'lerobot[pi]==0.6.0' hf auth login
+uv run --with 'lerobot[pi]==0.6.0' hf auth whoami
 ```
 
 ブラウザで同意したアカウントが`whoami`に表示されたら、次の小さなファイルでアクセスの入口を確かめます。
 
 ```bash
-uv run --with 'lerobot[pi]>=0.6.0' python - <<'PYCODE'
+uv run --with 'lerobot[pi]==0.6.0' python - <<'PYCODE'
 from huggingface_hub import hf_hub_download
 p = hf_hub_download('google/paligemma-3b-pt-224', 'config.json')
 print('PaliGemma access:', p)
@@ -113,7 +133,7 @@ GPUの空きメモリは`nvidia-smi`で確認します。次の例はbatch 1、B
 cd /path/to/aloha-vla-reference/lerobot_trossen
 OUT=/path/to/outputs/pi05_4cam_smoke
 
-uv run --with 'lerobot[pi]>=0.6.0' --with accelerate lerobot-train \
+uv run --with 'lerobot[pi]==0.6.0' --with accelerate==1.15.0 lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
   --dataset.root="$DATASET" \
   --policy.type=pi05 \
@@ -133,7 +153,7 @@ uv run --with 'lerobot[pi]>=0.6.0' --with accelerate lerobot-train \
 test -f "$OUT/checkpoints/000003/pretrained_model/model.safetensors"
 ```
 
-これは**基盤重みを読み、3回更新して保存する接続試験**です。`accelerate`がないと学習が開始できません。Trossenプラグインには`training` extraがないため、コマンドの`--with accelerate`を使います。`transformers`だけを単独で最新版に更新すると、lock内の`safetensors`と依存が衝突する場合があります。環境で実際に選ばれたパッケージ版と`train_config.json`を保存してください。`>=0.6.0`だけでは、将来の追加依存の版までは固定しません。
+これは**基盤重みを読み、3回更新して保存する接続試験**です。`accelerate`がないと学習が開始できません。Trossenプラグインには`training` extraがないため、コマンドの`--with accelerate`を使います。`transformers`だけを単独で最新版に更新すると、lock内の`safetensors`と依存が衝突する場合があります。環境で実際に選ばれたパッケージ版と`train_config.json`を保存してください。LeRobotとaccelerateの指定だけでは、追加依存の全体や基盤重みのrevisionまでは固定しません。再現や研究比較には、実際の実行環境と使用した基盤重みのrevisionも記録してください。
 
 **確認の目安：** 3-step終了後に`checkpoints/000003/pretrained_model/`ができ、再ロードできること。確認に使ったπ₀.₅ checkpointは約8.8 GBでした。保存容量はGPUの必要量や習得した技能を意味しません。
 
@@ -146,7 +166,7 @@ cd /path/to/aloha-vla-reference/lerobot_trossen
 CHECKPOINT=/path/to/outputs/pi05_4cam_smoke/checkpoints/000003/pretrained_model
 
 CHECKPOINT="$CHECKPOINT" DATASET="$DATASET" \
-uv run --with 'lerobot[pi]>=0.6.0' --with accelerate python - <<'PYCODE'
+uv run --with 'lerobot[pi]==0.6.0' --with accelerate==1.15.0 python - <<'PYCODE'
 import os
 from pathlib import Path
 import torch
@@ -194,7 +214,7 @@ cd /path/to/aloha-vla-reference/lerobot_trossen
 
 OUT=/path/to/outputs/smolvla_4cam_smoke
 
-uv run --with 'lerobot[smolvla]>=0.6.0' lerobot-train \
+uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
   --dataset.root="$DATASET" \
   --policy.path=lerobot/smolvla_base \
@@ -220,7 +240,7 @@ smoke runが通ったら、短い教材学習を実行します。ここでは20
 ```bash
 OUT=/path/to/outputs/smolvla_4cam_tutorial_200steps
 
-uv run --with 'lerobot[smolvla]>=0.6.0' lerobot-train \
+uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
   --dataset.root="$DATASET" \
   --policy.path=lerobot/smolvla_base \
@@ -245,7 +265,7 @@ uv run --with 'lerobot[smolvla]>=0.6.0' lerobot-train \
 cd /path/to/aloha-vla-reference/lerobot_trossen
 CHECKPOINT=/path/to/outputs/smolvla_4cam_tutorial_200steps/checkpoints/000200/pretrained_model
 
-CHECKPOINT="$CHECKPOINT" DATASET="$DATASET" uv run --with 'lerobot[smolvla]>=0.6.0' python - <<'PYCODE'
+CHECKPOINT="$CHECKPOINT" DATASET="$DATASET" uv run --with 'lerobot[smolvla]==0.6.0' python - <<'PYCODE'
 import os
 from pathlib import Path
 
@@ -293,7 +313,9 @@ PYCODE
 
 > **安全境界**：オフライン推論で得たactionを、そのままロボットに送ってはいけません。実機実行には、ロボット用環境・カメラ入力・関節順序・単位・action chunkの実行方法・速度や範囲の制限・非常停止を確認する別のデプロイ手順が必要です。本章のオフライン推論は実機ポリシー実行を含みません。
 
-## 4. 第一期のセンサ収録から研究へ
+## 4. センサ収録から研究へ
+
+センサ追加の必要性と効果を示す比較の考え方は[10の第3・4節](10_stack_decisions_and_extension.md)を参照します。以下は変更箇所を調べるための境界で、融合の有効性を実証した手順ではありません。
 
 [03 外部センサの追加](03_architecture_and_extension.md)では力覚や触覚を取得・時刻対応させるまでを扱います。**記録しただけでモデルの入力にはなりません。** 例えば右手の力覚を使って把持を変える研究では、次の順に境界を確認します。
 

@@ -30,13 +30,12 @@ flowchart TD
 
 ## 2. まず1 episodeで変換を確かめる
 
-手元のv3データを使います。以下は`/path/to/...`を自分のパスに置き換えて実行します。`REPO`はこのマニュアルのリポジトリ、`TROSSEN`は[01](01_reference_stack.md)で構築した`lerobot_trossen`、`BRIDGE`は**リポジトリ外**の作業領域です。
+手元のv3データを使います。開始前に[READMEの作業場所の設定](../README.md#コマンドを使う前に作業場所を一度設定する)を行います。08から同じ端末で続ける場合は設定済みの値を使います。`TROSSEN`は[01](01_reference_stack.md)で構築した`lerobot_trossen`、`BRIDGE`は**リポジトリ外**の作業領域です。元データの名前は変更しません。変換先の`aloha_vla_demo`は付属builder・patchに対応する名前なので維持します。
 
 ```bash
-REPO=/path/to/aloha-vla-reference
+cd "$REPO"
 TROSSEN="$REPO/lerobot_trossen"
-DATASET="$REPO/data/aloha_vla_demo"
-BRIDGE=/path/to/openvla_oft_bridge
+test -d "$DATASET"
 mkdir -p "$BRIDGE/aloha_vla_demo/train"
 
 cd "$TROSSEN"
@@ -71,7 +70,6 @@ OFT公開元が案内する[ALOHA用RLDS builder](https://github.com/moojink/rld
 本教材の変換を確認した環境はPython 3.9、`tensorflow==2.13.0`、`tensorflow-datasets==4.9.2`、`h5py==3.9.0`、`numpy==1.24.3`でした。例えば次のように専用仮想環境を用意します。
 
 ```bash
-BUILDER_ENV=/path/to/rlds-builder-env
 uv venv --python 3.9 "$BUILDER_ENV"
 uv pip install --python "$BUILDER_ENV/bin/python" \
   'tensorflow==2.13.0' 'tensorflow-datasets==4.9.2' \
@@ -130,7 +128,7 @@ OFT側はLeRobotの`lerobot-train`とは別のPython環境です。依存条件�
 commit `e4287e94541f459edc4feabc4e181f537cd569a8`に固定したリポジトリへ、`examples/openvla_oft/openvla_oft_aloha.patch`を適用します。適用前に`git status`で手元の変更を確認し、同じ差分を二重適用しないでください。
 
 ```bash
-OFT=/path/to/openvla-oft
+test -d "$OFT"
 cd "$OFT"
 git status --short
 git rev-parse HEAD

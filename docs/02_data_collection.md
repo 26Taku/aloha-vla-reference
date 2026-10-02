@@ -27,7 +27,7 @@ flowchart TD
 
 例えば、説明が次の場合、
 
-```bash
+```text
 uv run trossen-arm identify --ip <ARM_IP>
 ```
 
@@ -103,10 +103,11 @@ GitHubから取得する場合は次を実行する。
 ```bash
 git clone https://github.com/KawaharaLab/aloha-vla-reference.git
 cd aloha-vla-reference
+source ./scripts/session.sh
 ./setup.sh
 ```
 
-ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirectoryへ移動して`./setup.sh`を実行する。
+ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirectoryへ移動して、`source ./scripts/session.sh`、`./setup.sh`の順に実行する。新しい端末では[READMEの作業場所の設定](../README.md#コマンドを使う前に作業場所を一度設定する)を行い、`cd "$REPO"`で教材ルートへ戻る。
 
 ### 何が起きるか
 
@@ -167,11 +168,12 @@ eno1    UP    192.168.1.1/24
 ```bash
 (
   cd lerobot_trossen
-  uv run trossen-arm identify --ip <ARM_IP>
+  read -r -p "確認するArmのIP address: " ARM_IP
+  uv run trossen-arm identify --ip "$ARM_IP"
 )
 ```
 
-`<ARM_IP>`は、`discover`で表示された実際の値へ置き換える。`identify`ではgripperが動くため、指や工具を近づけない。動いたArmを見て、次の表を自分の値で埋める。
+問いが表示されたら、`discover`で表示された実際のIPを入力する。`identify`ではgripperが動くため、指や工具を近づけない。動いたArmを見て、次の表を自分の値で埋める。
 
 | 物理的な役割 | 確認したIP address |
 |---|---|

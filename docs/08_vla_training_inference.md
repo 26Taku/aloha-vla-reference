@@ -11,15 +11,15 @@
 
 ロボットを接続していないGPU搭載PCでも、本章を実行できます。02のStep 1でソフトウェア環境を準備し、収録済みDatasetのディレクトリ全体をコピーするか、読める場所へ置きます。Armのdiscover・identify、teleoperationはこの学習PCでは不要です。`validate_dataset.sh`はcamera名を記録templateから読み、実機のIP・serial設定を要求しません。
 
-次の例の`/path/to/...`は、自分のリポジトリとDatasetの場所に置き換えます。収録PCと同じ絶対パスを使う必要はありません。
+開始前に[READMEの作業場所の設定](../README.md#コマンドを使う前に作業場所を一度設定する)を行います。外部データを使う場合は、そこで`DATASET`を一度入力してください。本章はその値を使い、収録PCと同じ絶対パスを要求しません。
 
 ## まず自分のdatasetを確認する
 
 02の`./record.sh`で作成した実習用datasetを、次のように確認します。別の作業を収録した場合は、自分が付けた名前とタスク文に置き換えてください。
 
 ```bash
-cd /path/to/aloha-vla-reference
-DATASET=/path/to/aloha-vla-reference/data/aloha_vla_demo
+cd "$REPO"
+test -d "$DATASET"
 ./validate_dataset.sh "$DATASET"
 cd lerobot_trossen
 DATASET="$DATASET" uv run python - <<'PYCODE'
@@ -61,10 +61,10 @@ PYCODE
 
 ## 2. 実習A：LeRobot版π₀.₅
 
-以下の端末で第1節と同じdataset rootを設定し、実習Bにも引き継ぎます。新しい端末を開いたら再設定してください。
+同じ端末では、冒頭で設定した`DATASET`を実習Bにも引き継ぎます。新しい端末ではREADMEの設定を行い直してください。次は入力先が存在するかの確認で、値を上書きしません。
 
 ```bash
-DATASET=/path/to/aloha-vla-reference/data/aloha_vla_demo
+test -d "$DATASET"
 ```
 
 π₀.₅の学習コマンドは[02](02_data_collection.md)で作成した`lerobot_trossen`で実行します。`DATASET`には第1節と同じ`aloha_vla_demo`を指定します。例はALOHAの4 RGB画像（424×240、30 fps）、14次元の関節状態・行動を前提にします。画像キーや次元が異なる場合は先にモデルの設定と照合してください。
@@ -93,7 +93,7 @@ DATASET=/path/to/aloha-vla-reference/data/aloha_vla_demo
 3. 学習に使う端末で次を実行し、tokenを対話式プロンプトに貼ります。tokenをコマンドライン引数、スクリプト、Gitへ書き込まないでください。
 
 ```bash
-cd /path/to/aloha-vla-reference/lerobot_trossen
+cd "$REPO/lerobot_trossen"
 uv run --with 'lerobot[pi]==0.6.0' hf auth login
 uv run --with 'lerobot[pi]==0.6.0' hf auth whoami
 ```
@@ -130,8 +130,8 @@ GPUの空きメモリは`nvidia-smi`で確認します。次の例はbatch 1、B
 ### 2.3 短い学習とcheckpoint保存
 
 ```bash
-cd /path/to/aloha-vla-reference/lerobot_trossen
-OUT=/path/to/outputs/pi05_4cam_smoke
+cd "$REPO/lerobot_trossen"
+OUT="$OUTPUTS/pi05_4cam_smoke"
 
 uv run --with 'lerobot[pi]==0.6.0' --with accelerate==1.15.0 lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
@@ -162,8 +162,8 @@ test -f "$OUT/checkpoints/000003/pretrained_model/model.safetensors"
 次のコードは同じ`aloha_vla_demo`から1フレームを取り、保存済みpolicyと前後処理を読み直します。成功率計算ではありません。`CHECKPOINT`の出力先を自分の場所に合わせます。
 
 ```bash
-cd /path/to/aloha-vla-reference/lerobot_trossen
-CHECKPOINT=/path/to/outputs/pi05_4cam_smoke/checkpoints/000003/pretrained_model
+cd "$REPO/lerobot_trossen"
+CHECKPOINT="$OUTPUTS/pi05_4cam_smoke/checkpoints/000003/pretrained_model"
 
 CHECKPOINT="$CHECKPOINT" DATASET="$DATASET" \
 uv run --with 'lerobot[pi]==0.6.0' --with accelerate==1.15.0 python - <<'PYCODE'
@@ -210,9 +210,9 @@ PYCODE
 次のコマンドは、Trossen統合リポジトリ上でLeRobotのSmolVLA追加依存を実行環境に解決し、`DATASET`で3ステップ学習する第二実習です。3ステップは学習性能を見る長さではなく、データとモデルの互換性・GPU実行・チェックポイント保存を短時間で確認します。
 
 ```bash
-cd /path/to/aloha-vla-reference/lerobot_trossen
+cd "$REPO/lerobot_trossen"
 
-OUT=/path/to/outputs/smolvla_4cam_smoke
+OUT="$OUTPUTS/smolvla_4cam_smoke"
 
 uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
@@ -238,7 +238,7 @@ uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
 smoke runが通ったら、短い教材学習を実行します。ここでは200ステップの出力チェックポイントを作成します。出力ディレクトリは実行ごとに分け、前のrunを上書きしません。
 
 ```bash
-OUT=/path/to/outputs/smolvla_4cam_tutorial_200steps
+OUT="$OUTPUTS/smolvla_4cam_tutorial_200steps"
 
 uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
@@ -262,8 +262,8 @@ uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
 学習が終わったら、学習中のメモリ上のモデルを使い回すのではなく、保存先の `pretrained_model` から再ロードします。別プロセスで指定したepisodeを読み込み、前処理後に推論したactionが存在し、すべて有限値かを確認します。
 
 ```bash
-cd /path/to/aloha-vla-reference/lerobot_trossen
-CHECKPOINT=/path/to/outputs/smolvla_4cam_tutorial_200steps/checkpoints/000200/pretrained_model
+cd "$REPO/lerobot_trossen"
+CHECKPOINT="$OUTPUTS/smolvla_4cam_tutorial_200steps/checkpoints/000200/pretrained_model"
 
 CHECKPOINT="$CHECKPOINT" DATASET="$DATASET" uv run --with 'lerobot[smolvla]==0.6.0' python - <<'PYCODE'
 import os

@@ -5,6 +5,27 @@
 **新しいsensorを追加するときの実行順序は03を参照する。**  
 本資料はscriptごとのCLI、input、outputを確認するときに使用する。
 
+## 実行例の入力を一度設定する
+
+[READMEの作業場所の設定](../../README.md#コマンドを使う前に作業場所を一度設定する)後、`cd "$REPO"`で教材ルートへ戻る。数値sensorの例では、03で確認したtopic・message type・sensor IDを次の問いへ入力する。以後の実行コマンドを編集する必要はない。
+
+```bash
+read -r -p "ROS 2 topic: " SENSOR_TOPIC
+read -r -p "Message type（例 geometry_msgs/msg/WrenchStamped）: " MSG_TYPE
+read -r -p "Sensor ID: " SENSOR_ID
+SENSOR_DIR="$REPO/data/sensor_logs"
+mkdir -p "$SENSOR_DIR"
+ROBOT_FRAMES="$REPO/data/sensor_reference/meta/frame_timestamps/episode_000000.jsonl"
+RAW_JSONL="$SENSOR_DIR/numeric_raw.jsonl"
+ALIGNMENT_JSONL="$SENSOR_DIR/numeric_alignment.jsonl"
+WINDOW_JSONL="$SENSOR_DIR/numeric_windows.jsonl"
+VIDEO_MKV="$SENSOR_DIR/camera.mkv"
+CAMERA_TIMESTAMP_JSONL="$SENSOR_DIR/camera_timestamps.jsonl"
+CAMERA_ALIGNMENT_JSONL="$SENSOR_DIR/camera_alignment.jsonl"
+```
+
+`ROBOT_FRAMES`は下の収録例に対応する。別Datasetやepisodeを使う場合は、`read -r -p "Robot timestamp JSONL: " ROBOT_FRAMES`で入力先だけを一度変更する。cameraの収録は[camera資料](camera/README.md)を参照し、出力videoとtimestampのパスを両資料で揃える。設定値は同じ端末内で有効で、新しい端末では再設定する。出力名は例なので、別試行では新しい名前を選ぶ。
+
 ## 1. Script map
 
 | Script | Purpose | Main input | Main output |
@@ -112,10 +133,10 @@ python3 -c "import rclpy; import rosidl_runtime_py"
 
 ```bash
 python3 examples/custom_sensor/ros2_timeseries_logger.py \
-  --topic <TOPIC> \
-  --msg-type <PACKAGE/msg/TYPE> \
-  --sensor-id <SENSOR_ID> \
-  --output <RAW_JSONL> \
+  --topic "$SENSOR_TOPIC" \
+  --msg-type "$MSG_TYPE" \
+  --sensor-id "$SENSOR_ID" \
+  --output "$RAW_JSONL" \
   --duration 10
 ```
 
@@ -178,9 +199,9 @@ sensor_time <= t_robot
 
 ```bash
 python3 examples/custom_sensor/align_timeseries.py \
-  --robot-frames <ROBOT_TIMESTAMP_JSONL> \
-  --sensor <RAW_SENSOR_JSONL> \
-  --output <ALIGNMENT_JSONL>
+  --robot-frames "$ROBOT_FRAMES" \
+  --sensor "$RAW_JSONL" \
+  --output "$ALIGNMENT_JSONL"
 ```
 
 optional:
@@ -214,14 +235,14 @@ sensor age max
 
 ```bash
 python3 examples/custom_sensor/validate_alignment.py \
-  <ALIGNMENT_JSONL>
+  "$ALIGNMENT_JSONL"
 ```
 
 smoke testで全robot frameにsampleを要求する場合:
 
 ```bash
 python3 examples/custom_sensor/validate_alignment.py \
-  <ALIGNMENT_JSONL> \
+  "$ALIGNMENT_JSONL" \
   --require-complete
 ```
 
@@ -258,9 +279,9 @@ raw valueは複製せず、sample index / timestamp rangeをmanifestへ保存す
 
 ```bash
 python3 examples/custom_sensor/build_sensor_windows.py \
-  --robot-frames <ROBOT_TIMESTAMP_JSONL> \
-  --sensor <RAW_SENSOR_JSONL> \
-  --output <WINDOW_JSONL> \
+  --robot-frames "$ROBOT_FRAMES" \
+  --sensor "$RAW_JSONL" \
+  --output "$WINDOW_JSONL" \
   --window-ms 200
 ```
 
@@ -292,8 +313,8 @@ samples/window median / p05 / p95 / min / max
 
 ```bash
 python3 examples/custom_sensor/camera/extract_mkv_timestamps.py \
-  <VIDEO_MKV> \
-  --output <CAMERA_TIMESTAMP_JSONL>
+  "$VIDEO_MKV" \
+  --output "$CAMERA_TIMESTAMP_JSONL"
 ```
 
 前提:
@@ -318,9 +339,9 @@ video_frame_index
 
 ```bash
 python3 examples/custom_sensor/camera/align_camera_frames.py \
-  --robot-frames <ROBOT_TIMESTAMP_JSONL> \
-  --camera-timestamps <CAMERA_TIMESTAMP_JSONL> \
-  --output <CAMERA_ALIGNMENT_JSONL>
+  --robot-frames "$ROBOT_FRAMES" \
+  --camera-timestamps "$CAMERA_TIMESTAMP_JSONL" \
+  --output "$CAMERA_ALIGNMENT_JSONL"
 ```
 
 optional:

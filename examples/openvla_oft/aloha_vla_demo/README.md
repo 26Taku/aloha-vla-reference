@@ -1,6 +1,6 @@
 # Tutorial ALOHA RLDS builder (`aloha_vla_demo`)
 
-This is an adaptation of the [OpenVLA-OFT ALOHA builder example](https://github.com/moojink/rlds_dataset_builder/tree/main/aloha1_put_X_into_pot_300_demos) at commit `6174b0b6bb69df6361f1117944952bf14afb0cc3`. `conversion_utils.py` comes from that upstream example. See the [upstream license](https://github.com/moojink/rlds_dataset_builder/blob/main/LICENSE) when redistributing the code.
+This is an adaptation of the [OpenVLA-OFT ALOHA builder example](https://github.com/moojink/rlds_dataset_builder/tree/main/aloha1_put_X_into_pot_300_demos) at commit `6174b0b6bb69df6361f1117944952bf14afb0cc3`. `conversion_utils.py` comes from that upstream example. The upstream copyright and MIT license notice for the copied/adapted builder code are included in [LICENSE.upstream](LICENSE.upstream); the [original notice at the source revision](https://github.com/moojink/rlds_dataset_builder/blob/6174b0b6bb69df6361f1117944952bf14afb0cc3/LICENSE) is also available. This notice does not assign a license to unrelated files in this tutorial.
 
 The conversion reads `train/*.hdf5` under `ALOHA_HDF5_ROOT`, preserves four 256×256 RGB views, 14D joint states and actions, and the language instruction in each source file's HDF5 attribute. It creates an RLDS/TFDS train split. The OpenVLA-OFT loader selects the high and two wrist views; the low view remains stored but is not used by that three-camera setting.
 

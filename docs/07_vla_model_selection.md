@@ -156,7 +156,7 @@ Trossenの[学習・評価の公式案内](https://docs.trossenrobotics.com/tros
 
 - [Trossen Arm: Getting Started](https://docs.trossenrobotics.com/trossen_arm/main/getting_started.html) / [Software Setup](https://docs.trossenrobotics.com/trossen_arm/main/getting_started/software_setup.html) / [Training and Evaluating](https://docs.trossenrobotics.com/trossen_arm/main/tutorials/lerobot_plugin/train_and_evaluate.html) — 接続、初期設定、学習後の実機経路は公式手順を参照。
 - [Trossen Robotics LeRobot integration](https://github.com/TrossenRobotics/lerobot_trossen) — 本教材の統合revisionと記録経路。
-- [LeRobot ACT](https://github.com/huggingface/lerobot/blob/main/docs/source/act.mdx) / [Diffusion Policy](https://github.com/huggingface/lerobot/blob/main/docs/source/diffusion.mdx) — 非VLAの模倣学習基準候補。
+- [LeRobot ACT](https://github.com/huggingface/lerobot/blob/main/docs/source/act.mdx) / [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/) — 非VLAの模倣学習基準候補。
 - [LeRobot: SmolVLA](https://github.com/huggingface/lerobot/blob/main/docs/source/smolvla.mdx) — SmolVLAの概念・学習設定。上流のmainは更新されるため、再現では使用revisionを固定する。
 - [LeRobot SmolVLA training code](https://github.com/huggingface/lerobot/blob/main/src/lerobot/policies/smolvla/modeling_smolvla.py) — 実装と追加依存の確認。
 - [OpenVLA paper](https://arxiv.org/abs/2406.09246) / [OpenVLA-OFT paper](https://arxiv.org/abs/2502.19645) / [OFT project and code](https://openvla-oft.github.io/) / [OFT ALOHA tutorial](https://github.com/moojink/openvla-oft/blob/main/ALOHA.md) — 基盤モデルと、fine-tuning時のaction decoding・action representation・objective、ALOHA向けRLDS変換の発展。

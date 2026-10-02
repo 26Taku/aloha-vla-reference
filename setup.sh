@@ -93,7 +93,8 @@ echo
 # ------------------------------------------------------------
 echo "Creating/verifying isolated Python environment..."
 cd "$TROSSEN_DIR"
-uv sync --frozen
+# Match the locked Python requirement instead of the host default.
+uv sync --python 3.12 --frozen
 
 echo
 

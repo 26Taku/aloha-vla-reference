@@ -125,6 +125,8 @@ source ./scripts/session.sh
 
 ### 何が起きるか
 
+`setup.sh`はPython 3.12を明示して専用環境を用意する。対応するPythonが見つからない場合、uvの標準設定では自動ダウンロードされる。system Pythonの版を変更する必要はない。
+
 `setup.sh`はTrossen連携softwareを取得し、確認済みcommitへ合わせ、`uv`でproject専用のPython environmentを作る。詳しい役割は[01 使用するソフトウェア](01_reference_stack.md)で説明している。
 
 ### 完了条件
@@ -135,14 +137,14 @@ source ./scripts/session.sh
 
 ここで失敗した場合は[04のsetup・dependency](04_troubleshooting.md)を確認する。
 
-`The current Python version ... is not compatible with ... ==3.12.*`と出た場合だけ、`uv`がこの教材の固定版と異なるPythonを選んでいる。system Pythonを変更せず、取得済みの`lerobot_trossen`で3.12を指定してから`./setup.sh`を再実行する。
+旧版の`setup.sh`で`The current Python version ... is not compatible with ... ==3.12.*`と出た場合だけ、`uv`がこの教材の固定版と異なるPythonを選んでいる。system Pythonを変更せず、取得済みの`lerobot_trossen`で3.12を指定してから`./setup.sh`を再実行する。
 
 ```bash
-cd lerobot_trossen
+cd "$REPO/lerobot_trossen"
 uv python install 3.12
 uv sync --python 3.12 --frozen
 uv run python --version
-cd ..
+cd "$REPO"
 ./setup.sh
 ```
 

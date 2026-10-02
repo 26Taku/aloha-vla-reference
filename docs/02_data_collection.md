@@ -107,7 +107,21 @@ source ./scripts/session.sh
 ./setup.sh
 ```
 
-ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirectoryへ移動して、`source ./scripts/session.sh`、`./setup.sh`の順に実行する。新しい端末では[READMEの作業場所の設定](../README.md#コマンドを使う前に作業場所を一度設定する)を行い、`cd "$REPO"`で教材ルートへ戻る。
+ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirectoryへ移動して、`source ./scripts/session.sh`、`./setup.sh`の順に実行する。新しい端末では、下の「作業場所の設定」を行う。
+
+### 作業場所の設定
+
+コマンド例はUbuntuのbashを想定する。上の取得・セットアップ手順では、`source ./scripts/session.sh`で教材の場所を表す`REPO`を自動設定している。同じ端末で続ける場合は再実行不要である。
+
+新しい端末で作業を再開するときは、`README.md`と`setup.sh`がある教材のルートディレクトリへ移動し、次を実行する。教材を再取得したり、`setup.sh`を毎回実行したりする必要はない。
+
+```bash
+source ./scripts/session.sh
+```
+
+これは現在の端末にパスを用意するだけで、インストール・収録・ファイル作成は行わない。`source`は設定を現在の端末に残すために使う。以後は`cd "$REPO"`で教材ルートへ戻れる。新しい端末ではこの設定を行い直す。
+
+収録データの入力先は、データが用意できた後に[08](08_vla_training_inference.md#学習に使うデータの場所を指定する)で指定する。OpenVLA-OFT用の作業場所は、その経路を試す場合に[09](09_openvla_oft_data_bridge.md)で確認する。ここで指定する必要はない。機器のIP・serial・topic・deviceも、それぞれを使う手順で確認・入力する。
 
 ### 何が起きるか
 

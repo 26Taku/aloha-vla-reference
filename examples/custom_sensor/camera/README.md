@@ -24,7 +24,7 @@ causal latest-frame alignment
 
 ## 実行例の作業場所
 
-[READMEの作業場所の設定](../../../README.md#コマンドを使う前に作業場所を一度設定する)を行い、`cd "$REPO"`で教材ルートへ戻る。以下の出力パスは例で、既存fileの上書きが必要な場合は新しい出力名を選ぶ。数値sensor資料と併用する場合はvideoとtimestampの設定を共通にする。
+[02の作業場所の設定](../../../docs/02_data_collection.md#作業場所の設定)を行い、`cd "$REPO"`で教材ルートへ戻る。以下の出力パスは例で、既存fileの上書きが必要な場合は新しい出力名を選ぶ。数値sensor資料と併用する場合はvideoとtimestampの設定を共通にする。
 
 ```bash
 CAMERA_DIR="$REPO/data/sensor_logs"

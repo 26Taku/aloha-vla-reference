@@ -52,43 +52,6 @@ ALOHAがまだ組み立てられていない場合や、機器の配置・配線
 
 途中で問題が起きたら[04 Troubleshooting](docs/04_troubleshooting.md)を使います。softwareやhardwareを変更するときは[05 Maintenance](docs/05_maintenance.md)、データ収集までの確認値は[06 実機検証結果と正常性の判断](docs/06_validation_results.md)を参照してください。07の第1・2節でモデルと学習経路を整理したら、08でπ₀.₅を主実習、SmolVLAを第二実習として自分のデータを使います。07の後半には、必要に応じて参照できる論文と関連モデルをまとめています。OpenVLA-OFTへのデータ接続を試したい場合は09へ進みます。09では重みの学習と実機制御は扱いません。
 
-## コマンドを使う前に：作業場所を一度設定する
-
-以下のコマンド例はUbuntuのbashを想定します。clone後、またはZIP展開後に、`README.md`と`setup.sh`がある教材のルートディレクトリで次を実行してください。新しい端末を開いたときも同じ設定が必要です。
-
-```bash
-source ./scripts/session.sh
-```
-
-この設定は現在の端末にパスを用意するだけで、インストール・収録・ファイル作成は行いません。以後の例は`$REPO`を教材の場所として使うので、作業中にディレクトリを移動しても長いパスの編集は不要です。`source`を使うのは、設定した変数を現在の端末へ残すためです。
-
-| 変数 | 初期値・用途 |
-|---|---|
-| `REPO` | 教材のルート。自動検出 |
-| `DATASET` | 教材内の`data/aloha_vla_demo`。08・09の入力 |
-| `OUTPUTS` | 教材内の`outputs/`。学習結果 |
-| `BRIDGE` | 教材と同じ親ディレクトリの`openvla_oft_bridge/`。09の変換結果 |
-| `BUILDER_ENV` | 同じ親ディレクトリの`rlds-builder-env/`。RLDS builder環境 |
-| `OFT` | 同じ親ディレクトリの`openvla-oft/`。専用コード |
-
-外部にある収録データを使う場合は、次をそのまま実行し、表示された問いへ実際のディレクトリのパスを入力します。パスに空白があっても引用符は入力しません。以後の08・09ではこの値を使います。
-
-```bash
-read -r -p "Datasetのディレクトリ: " DATASET
-export DATASET
-test -d "$DATASET"
-```
-
-`OUTPUTS`・`BRIDGE`・`BUILDER_ENV`・`OFT`の場所を変える場合も、必要な変数だけ同じ方法で一度入力できます。例えば既存のOFT環境を使う場合は次を実行します。
-
-```bash
-read -r -p "OpenVLA-OFTのディレクトリ: " OFT
-export OFT
-test -d "$OFT"
-```
-
-入力済みの変数は`session.sh`を再度sourceしても保持します（`REPO`はsourceした教材から検出します）。各章の開始時は`cd "$REPO"`で教材ルートへ戻れます。機器のIP・serial・topic・deviceは実機で確認し、設定ファイルや案内された入力欄へ記入します。
-
 ## この教材の読み方
 
 本文には3種類の情報があります。

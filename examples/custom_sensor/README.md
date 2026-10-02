@@ -7,7 +7,7 @@
 
 ## 実行例の入力を一度設定する
 
-[READMEの作業場所の設定](../../README.md#コマンドを使う前に作業場所を一度設定する)後、`cd "$REPO"`で教材ルートへ戻る。数値sensorの例では、03で確認したtopic・message type・sensor IDを次の問いへ入力する。以後の実行コマンドを編集する必要はない。
+[02の作業場所の設定](../../docs/02_data_collection.md#作業場所の設定)後、`cd "$REPO"`で教材ルートへ戻る。数値sensorの例では、03で確認したtopic・message type・sensor IDを次の問いへ入力する。以後の実行コマンドを編集する必要はない。
 
 ```bash
 read -r -p "ROS 2 topic: " SENSOR_TOPIC

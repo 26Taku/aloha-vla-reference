@@ -30,7 +30,25 @@ flowchart TD
 
 ## 2. まず1 episodeで変換を確かめる
 
-手元のv3データを使います。開始前に[READMEの作業場所の設定](../README.md#コマンドを使う前に作業場所を一度設定する)を行います。08から同じ端末で続ける場合は設定済みの値を使います。`TROSSEN`は[01](01_reference_stack.md)で構築した`lerobot_trossen`、`BRIDGE`は**リポジトリ外**の作業領域です。元データの名前は変更しません。変換先の`aloha_vla_demo`は付属builder・patchに対応する名前なので維持します。
+手元のv3データを使います。08から同じ端末で続ける場合は設定済みの値を使います。新しい端末、または本章から始める場合は、[02の作業場所の設定](02_data_collection.md#作業場所の設定)と[08のデータの場所の指定](08_vla_training_inference.md#学習に使うデータの場所を指定する)を行ってください。08の学習を実行しておく必要はありません。
+
+この章では変換結果と専用環境を教材と同じ親ディレクトリに置きます。`session.sh`が用意する初期値は次のとおりです。これらのディレクトリは、対応する手順で作成します。
+
+| 変数 | 初期値・用途 |
+|---|---|
+| `BRIDGE` | 教材と同じ親ディレクトリの`openvla_oft_bridge/`。変換結果 |
+| `BUILDER_ENV` | 同じ親ディレクトリの`rlds-builder-env/`。RLDS builder環境 |
+
+初期値で進める場合は入力不要です。別の保存先が必要な場合だけ、変換前に次を実行して指定します。
+
+```bash
+read -r -p "変換結果の保存先ディレクトリ: " BRIDGE
+export BRIDGE
+read -r -p "RLDS builder環境のディレクトリ: " BUILDER_ENV
+export BUILDER_ENV
+```
+
+`TROSSEN`は[01](01_reference_stack.md)で構築した`lerobot_trossen`、`BRIDGE`は**リポジトリ外**の作業領域です。元データの名前は変更しません。変換先の`aloha_vla_demo`は付属builder・patchに対応する名前なので維持します。
 
 ```bash
 cd "$REPO"
@@ -124,6 +142,14 @@ PY
 ## 4. OFT側の入口を合わせる
 
 OFT側はLeRobotの`lerobot-train`とは別のPython環境です。依存条件はOpenVLA-OFT公開元の[SETUP](https://github.com/moojink/openvla-oft/blob/e4287e94541f459edc4feabc4e181f537cd569a8/SETUP.md)を参照します。公式はCondaを案内していますが、本章でローダ接続を確認したのはuvで用意した仮想環境です。以下のコマンドは、OFT用の依存が入った`$OFT/.venv/bin/python`を使う前提です。公式のConda手順だけではこのパスは作られません。Condaを選ぶ場合は実行Pythonの指定をその環境に合わせる必要があり、本章ではその経路を確認していません。
+
+ここで`OFT`に、準備したOpenVLA-OFTリポジトリの場所を指定します。初期値は教材と同じ親ディレクトリの`openvla-oft/`です。その場所に用意した場合は入力不要です。別の場所の既存環境を使う場合だけ次を実行してください。パスの指定だけでは、リポジトリやPython環境は作成されません。
+
+```bash
+read -r -p "OpenVLA-OFTのディレクトリ: " OFT
+export OFT
+test -d "$OFT"
+```
 
 commit `e4287e94541f459edc4feabc4e181f537cd569a8`に固定したリポジトリへ、`examples/openvla_oft/openvla_oft_aloha.patch`を適用します。適用前に`git status`で手元の変更を確認し、同じ差分を二重適用しないでください。
 

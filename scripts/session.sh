@@ -14,4 +14,4 @@ export BRIDGE="${BRIDGE:-$(dirname -- "$REPO")/openvla_oft_bridge}"
 export BUILDER_ENV="${BUILDER_ENV:-$(dirname -- "$REPO")/rlds-builder-env}"
 export OFT="${OFT:-$(dirname -- "$REPO")/openvla-oft}"
 unset _aloha_session_root
-printf 'Repository: %s\nDataset: %s\n' "$REPO" "$DATASET"
+printf 'Repository: %s\n' "$REPO"

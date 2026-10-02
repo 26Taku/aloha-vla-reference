@@ -4,7 +4,7 @@
 
 この章の到達点は、**自分の`aloha_vla_demo`から1 episodeをLeRobotDataset v3から変換し、OFTの学習用ローダが3視点・14次元状態・30時刻の行動列を出すところまで**です。重みの学習や実機実行は本章に含めません。データの橋渡しを理解した後で、OpenVLA-OFT公開元の[ALOHA手順](https://github.com/moojink/openvla-oft/blob/main/ALOHA.md)と[SETUP](https://github.com/moojink/openvla-oft/blob/main/SETUP.md)を参照して先へ進んでください。
 
-> **動作確認の範囲**：付属export・builder・patchの組合せで、TFDS生成とOFTローダ読込を確認しています。環境導入から本章全手順の一括再現性は未確認です。モデルのfine-tuning・checkpoint推論・実機制御は確認していません。
+> **動作確認の範囲**：Ubuntu 22.04.5のRTX A6000ワークステーションで、新規builder・OFT仮想環境の導入、1 episodeの変換・読み戻し・OFTローダ読込を確認しています。確認中に不足していたOFT導入手順を補いました。修正後の本文だけで最初から通す再検証は未完了です。既存OS・uv・パッケージキャッシュは利用しています。モデルのfine-tuning・checkpoint推論・実機制御は確認していません。
 
 ## 1. なぜ変換するのか
 
@@ -39,7 +39,7 @@ flowchart TD
 | `BRIDGE` | 教材と同じ親ディレクトリの`openvla_oft_bridge/`。変換結果 |
 | `BUILDER_ENV` | 同じ親ディレクトリの`rlds-builder-env/`。RLDS builder環境 |
 
-初期値で進める場合は入力不要です。別の保存先が必要な場合だけ、変換前に次を実行して指定します。
+初期値で進める場合は入力不要です。別の保存先が必要な場合だけ、変換前に次を実行して指定します。各`read`で入力待ちになるので、表示された問いにパスを入力し、Enterを押します。`export`は通常、何も表示しません。
 
 ```bash
 read -r -p "変換結果の保存先ディレクトリ: " BRIDGE
@@ -88,6 +88,7 @@ OFT公開元が案内する[ALOHA用RLDS builder](https://github.com/moojink/rld
 本教材の変換を確認した環境はPython 3.9、`tensorflow==2.13.0`、`tensorflow-datasets==4.9.2`、`h5py==3.9.0`、`numpy==1.24.3`でした。例えば次のように専用仮想環境を用意します。
 
 ```bash
+cd "$REPO"
 uv venv --python 3.9 "$BUILDER_ENV"
 uv pip install --python "$BUILDER_ENV/bin/python" \
   'tensorflow==2.13.0' 'tensorflow-datasets==4.9.2' \
@@ -141,26 +142,61 @@ PY
 
 ## 4. OFT側の入口を合わせる
 
-OFT側はLeRobotの`lerobot-train`とは別のPython環境です。依存条件はOpenVLA-OFT公開元の[SETUP](https://github.com/moojink/openvla-oft/blob/e4287e94541f459edc4feabc4e181f537cd569a8/SETUP.md)を参照します。公式はCondaを案内していますが、本章でローダ接続を確認したのはuvで用意した仮想環境です。以下のコマンドは、OFT用の依存が入った`$OFT/.venv/bin/python`を使う前提です。公式のConda手順だけではこのパスは作られません。Condaを選ぶ場合は実行Pythonの指定をその環境に合わせる必要があり、本章ではその経路を確認していません。
+OFT側はLeRobotの`lerobot-train`とは別のPython環境です。OpenVLA-OFT公開元の[固定版SETUP](https://github.com/moojink/openvla-oft/blob/e4287e94541f459edc4feabc4e181f537cd569a8/SETUP.md)はCondaとPython 3.10を案内しています。本教材ではuvの専用仮想環境を使います。LeRobot用環境や第3節のbuilder環境にはOFTの依存を入れません。
 
-ここで`OFT`に、準備したOpenVLA-OFTリポジトリの場所を指定します。初期値は教材と同じ親ディレクトリの`openvla-oft/`です。その場所に用意した場合は入力不要です。別の場所の既存環境を使う場合だけ次を実行してください。パスの指定だけでは、リポジトリやPython環境は作成されません。
+### 4.1 OFTリポジトリと専用環境を用意する
+
+`OFT`の初期値は教材と同じ親ディレクトリの`openvla-oft/`です。新しく用意する場合は、そのまま下の取得手順へ進みます。別の場所の既存環境を使う場合だけ次を実行してください。`read`で入力待ちになったらパスを入力し、Enterを押します。
 
 ```bash
 read -r -p "OpenVLA-OFTのディレクトリ: " OFT
 export OFT
-test -d "$OFT"
 ```
 
-commit `e4287e94541f459edc4feabc4e181f537cd569a8`に固定したリポジトリへ、`examples/openvla_oft/openvla_oft_aloha.patch`を適用します。適用前に`git status`で手元の変更を確認し、同じ差分を二重適用しないでください。
+次の手順は、存在しない場所にはリポジトリを取得し、既存の場所ではGitリポジトリ・公開元・未変更状態を確認します。変更済みの場合は停止するので、変更を消さず、新しい作業場所を選んでください。丸括弧内で失敗すると、そのブロックの後続処理は実行されません。
 
 ```bash
-test -d "$OFT"
-cd "$OFT"
-git status --short
-git rev-parse HEAD
-git apply --check "$REPO/examples/openvla_oft/openvla_oft_aloha.patch"
-git apply "$REPO/examples/openvla_oft/openvla_oft_aloha.patch"
-git diff --check
+(
+  set -e
+  cd "$REPO"
+  if [ ! -e "$OFT" ]; then
+    git clone https://github.com/moojink/openvla-oft.git "$OFT"
+  fi
+  test -d "$OFT/.git"
+  test "$(git -C "$OFT" remote get-url origin)" = "https://github.com/moojink/openvla-oft.git"
+  test -z "$(git -C "$OFT" status --porcelain)"
+  git -C "$OFT" fetch origin e4287e94541f459edc4feabc4e181f537cd569a8
+  git -C "$OFT" checkout --detach e4287e94541f459edc4feabc4e181f537cd569a8
+  cd "$OFT"
+  uv venv --python 3.10 .venv
+  uv pip install --python "$OFT/.venv/bin/python" -e . \
+    'numpy==1.26.4' 'protobuf==4.25.9' \
+    'tensorflow-metadata==1.17.3' \
+    'huggingface-hub==0.36.2' \
+    'accelerate==1.15.0' 'wandb==0.28.0' \
+    'transformers @ git+https://github.com/moojink/transformers-openvla-oft.git@bc339d9ad707454c0c115970db43c260067c61ab' \
+    'dlimp @ git+https://github.com/moojink/dlimp_openvla@040105d256bd28866cc6620621a3d5f7b6b91b46'
+  uv pip check --python "$OFT/.venv/bin/python"
+)
+```
+
+**完了条件**：インストールが成功し、`uv pip check`で依存の不整合がないこと。エラーが出たら第4.2節へ進まず、ログを確認してください。上の依存導入コマンドはPython 3.10.12の新規仮想環境で成功し、ローダ読込まで確認しています。主要依存とGit版を明示していますが、全依存のlockではありません。[固定版の依存定義](https://github.com/moojink/openvla-oft/blob/e4287e94541f459edc4feabc4e181f537cd569a8/pyproject.toml)に従ってPyTorch 2.2.0とTensorFlow 2.15.0等が入ります。公式SETUPのFlash Attention導入は学習向けです。本章はモデルを実行せずデータローダだけを確認する経路なので、ここでは導入しません。
+
+### 4.2 ALOHA用パッチを適用する
+
+固定したOFTリポジトリへ`examples/openvla_oft/openvla_oft_aloha.patch`を適用します。同じ差分を二重適用しないでください。
+
+```bash
+(
+  set -e
+  test -d "$OFT/.git"
+  cd "$OFT"
+  test "$(git rev-parse HEAD)" = "e4287e94541f459edc4feabc4e181f537cd569a8"
+  git status --short
+  git apply --check "$REPO/examples/openvla_oft/openvla_oft_aloha.patch"
+  git apply "$REPO/examples/openvla_oft/openvla_oft_aloha.patch"
+  git diff --check
+)
 ```
 
 パッチは`configs.py`で14次元の双腕状態・行動と画像名、`transforms.py`でALOHA用整形、`mixtures.py`でdataset名を登録します。さらに`constants.py`をALOHA・30時刻に設定します。OFTのデータローダは`data_mix`名に`aloha`が含まれると左右手首の2画像を追加で読みます。そこでTFDSのdataset名とOFTのmixture名を**ともに`aloha_vla_demo`**としています。単にカメラ画像をRLDSへ入れるだけではOFTの学習入力には届きません。
@@ -172,7 +208,7 @@ OFT環境で依存が衝突するときは`uv pip check --python "$OFT/.venv/bin
 最後にOpenVLA-OFTの**学習用データローダ**まで通します。推論モデルのロードや重みの学習ではありません。
 
 ```bash
-cd "$OFT"
+cd "$OFT" && \
 PYTHONPATH="$BUILDER:$OFT" \
 RLDS_ROOT="$BRIDGE/tfds" \
 CUDA_VISIBLE_DEVICES= TF_CPP_MIN_LOG_LEVEL=2 \
@@ -202,7 +238,13 @@ print("OFT DATA LOADER: PASS")
 PY
 ```
 
-上のコマンドが通れば、ローダから3画像、`proprio (1,14)`、`action (30,14)`が取り出せます。先の変換処理ではGPUを隠しているため、TensorFlowのCUDA初期化メッセージはデータ変換失敗を意味しません。自分の環境では上のassertionとプロセスの終了状態を確認してください。
+今回の確認ではFlash Attentionを導入せず、このローダのassertionと`OFT DATA LOADER: PASS`まで通りました。
+
+上のコマンドが通れば、ローダから3画像、`proprio (1,14)`、`action (30,14)`が取り出せます。本章の変換・ローダ確認では`CUDA_VISIBLE_DEVICES=`でGPUを非表示にしています。確認時はTensorFlowのCUDA初期化・factory重複メッセージが出ましたが、読み戻しとローダのPASSまで完了しました。メッセージだけで成否を判断せず、自分の環境では上のassertionとプロセスの終了状態を確認してください。
+
+### 同じデータで手順を再実行する場合
+
+元のDatasetはそのまま使います。変換先のHDF5が既に存在するとexportは停止し、生成済みTFDSは再利用されます。また、適用済みパッチをもう一度適用すると失敗します。新規作成から確認したい場合は、第2節で`BRIDGE`・`BUILDER_ENV`に、第4.1節で`OFT`に、既存試行とは別の未使用ディレクトリを指定して進めてください。既存の成果や環境を削除する必要はありません。名前の入力と`export`は各節の方法を使います。
 
 ## 5. 研究用の学習へ広げる前に
 

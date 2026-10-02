@@ -4,7 +4,7 @@
 
 この章の到達点は、**自分の`aloha_vla_demo`から1 episodeをLeRobotDataset v3から変換し、OFTの学習用ローダが3視点・14次元状態・30時刻の行動列を出すところまで**です。重みの学習や実機実行は本章に含めません。データの橋渡しを理解した後で、OpenVLA-OFT公開元の[ALOHA手順](https://github.com/moojink/openvla-oft/blob/main/ALOHA.md)と[SETUP](https://github.com/moojink/openvla-oft/blob/main/SETUP.md)を参照して先へ進んでください。
 
-> **動作確認の範囲**：Ubuntu 22.04.5のRTX A6000ワークステーションで、新規builder・OFT仮想環境の導入、1 episodeの変換・読み戻し・OFTローダ読込を確認しています。確認中に不足していたOFT導入手順を補いました。修正後の本文だけで最初から通す再検証は未完了です。既存OS・uv・パッケージキャッシュは利用しています。モデルのfine-tuning・checkpoint推論・実機制御は確認していません。
+> **動作確認の範囲**：Ubuntu 22.04.5のRTX A6000ワークステーションで、新規builder・OFT仮想環境の導入、1 episodeの変換・読み戻し・OFTローダ読込を確認しています。2026年10月2日、教材commit `7b9cd7f`の第2〜4節を順に再実行し、HDF5出力、TFDS生成・598 frameの読み戻し、専用環境の作成・依存チェック、パッチ適用、`OFT DATA LOADER: PASS`まで確認しました。builderはPython 3.9.25、OFTはPython 3.10.12です。既存OS・uv・パッケージキャッシュと収録済みデータは利用しており、OSを含む完全なクリーン環境の検証ではありません。モデルのfine-tuning・checkpoint推論・実機制御は確認していません。
 
 ## 1. なぜ変換するのか
 

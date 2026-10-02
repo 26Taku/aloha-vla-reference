@@ -1,0 +1,68 @@
+diff --git a/prismatic/vla/constants.py b/prismatic/vla/constants.py
+index 229ae94..6f87409 100644
+--- a/prismatic/vla/constants.py
++++ b/prismatic/vla/constants.py
+@@ -31,7 +31,7 @@ LIBERO_CONSTANTS = {
+ }
+ 
+ ALOHA_CONSTANTS = {
+-    "NUM_ACTIONS_CHUNK": 25,
++    "NUM_ACTIONS_CHUNK": 30,
+     "ACTION_DIM": 14,
+     "PROPRIO_DIM": 14,
+     "ACTION_PROPRIO_NORMALIZATION_TYPE": NormalizationType.BOUNDS,
+@@ -61,7 +61,7 @@ def detect_robot_platform():
+ 
+ 
+ # Determine which robot platform to use
+-ROBOT_PLATFORM = detect_robot_platform()
++ROBOT_PLATFORM = "ALOHA"  # Explicit setting for this ALOHA experiment
+ 
+ # Set the appropriate constants based on the detected platform
+ if ROBOT_PLATFORM == "LIBERO":
+diff --git a/prismatic/vla/datasets/rlds/oxe/configs.py b/prismatic/vla/datasets/rlds/oxe/configs.py
+index 3222e02..e3e1172 100644
+--- a/prismatic/vla/datasets/rlds/oxe/configs.py
++++ b/prismatic/vla/datasets/rlds/oxe/configs.py
+@@ -706,4 +706,17 @@ OXE_DATASET_CONFIGS = {
+         "state_encoding": StateEncoding.JOINT_BIMANUAL,
+         "action_encoding": ActionEncoding.JOINT_POS_BIMANUAL,
+     },
++    "aloha_vla_demo": {
++        "image_obs_keys": {
++            "primary": "image",
++            "secondary": None,
++            "left_wrist": "left_wrist_image",
++            "right_wrist": "right_wrist_image",
++        },
++        "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None},
++        "state_obs_keys": ["state"],
++        "state_encoding": StateEncoding.JOINT_BIMANUAL,
++        "action_encoding": ActionEncoding.JOINT_POS_BIMANUAL,
++    },
++
+ }
+diff --git a/prismatic/vla/datasets/rlds/oxe/mixtures.py b/prismatic/vla/datasets/rlds/oxe/mixtures.py
+index c5a2862..efd2126 100644
+--- a/prismatic/vla/datasets/rlds/oxe/mixtures.py
++++ b/prismatic/vla/datasets/rlds/oxe/mixtures.py
+@@ -226,5 +226,8 @@ OXE_NAMED_MIXTURES: Dict[str, List[Tuple[str, float]]] = {
+     "aloha1_put_X_into_pot_300_demos": [
+         ("aloha1_put_X_into_pot_300_demos", 1.0),
+     ],
++    "aloha_vla_demo": [
++        ("aloha_vla_demo", 1.0),
++    ],
+ # fmt: on
+ }
+diff --git a/prismatic/vla/datasets/rlds/oxe/transforms.py b/prismatic/vla/datasets/rlds/oxe/transforms.py
+index bf848e9..4e2a368 100644
+--- a/prismatic/vla/datasets/rlds/oxe/transforms.py
++++ b/prismatic/vla/datasets/rlds/oxe/transforms.py
+@@ -930,4 +930,6 @@ OXE_STANDARDIZATION_TRANSFORMS = {
+     "aloha1_fold_shirt_30_demos": aloha_dataset_transform,
+     "aloha1_scoop_X_into_bowl_45_demos": aloha_dataset_transform,
+     "aloha1_put_X_into_pot_300_demos": aloha_dataset_transform,
++    "aloha_vla_demo": aloha_dataset_transform,
++
+ }

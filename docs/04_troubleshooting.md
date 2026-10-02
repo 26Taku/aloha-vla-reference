@@ -25,7 +25,7 @@ flowchart TD
 | 症状 | 最初に読む節 |
 |---|---|
 | Setupが終了しない | [2. `setup.sh`が失敗する](#2-setupsh-が失敗する) |
-| Local configのerror | [3](#3-hardware-localyaml-がない)、[4](#4-replace_with-が残っている) |
+| Local configのerror | [3](#3-hardware-localyaml-がない)、[4](#4-設定のプレースホルダーが残っている) |
 | Armが見えない | [5. Arm Controllerが見つからない](#5-arm-controllerが見つからない) |
 | Cameraが見えない | [6. RealSenseが認識されない](#6-realsenseが認識されない--configured-serialが見つからない) |
 | Armが急停止した | [7. Joint limit](#7-teleoperationが-joint-limit-exceeded-で停止する) |
@@ -61,7 +61,9 @@ cp config/hardware-template.yaml config/hardware-local.yaml
 
 [02のStep 4](02_data_collection.md)に従って4 ArmのIPと4 RealSenseのserialを設定する。
 
-## 4. `REPLACE_WITH_...` が残っている
+## 4. 設定のプレースホルダーが残っている
+
+`REPLACE_WITH_...`は機器固有の値を入力するための仮の文字列です。
 
 ```bash
 grep -n 'REPLACE_WITH_' config/hardware-local.yaml

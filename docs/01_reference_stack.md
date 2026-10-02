@@ -91,17 +91,17 @@ config/hardware-local.yaml
 
 ## 5. 保存されたDatasetは、次の学習工程への入口になる
 
-この資料が扱う主な範囲は、teleoperationでデモを作り、LeRobotDataset v3として検証するところまでである。
+データ収集と検証の後には、同じデモを使ってモデルの入力を確認し、短い学習と保存済みcheckpointからのオフライン推論を行う。
 
 ```mermaid
 flowchart TD
     A["Teleoperation"] --> B["Demonstration収録"]
     B --> C["LeRobotDataset v3"]
     C --> D["Modelの学習"]
-    D --> E["Robotで推論"]
+    D --> E["保存済み観測でオフライン推論"]
 ```
 
-ACT、SmolVLA、π系などは、Datasetから動作を学習する**model**の候補である。modelをどのrepositoryやCLIで学習・推論するかは別の選択である。本資料では、まずどのmodelを選ぶ場合にも必要になる「信頼できるデモを作る」工程に集中する。
+画像と指示文から行動を生成する**VLA**の候補にはSmolVLA、π系、OpenVLA系がある。ACTやDiffusion Policyは、固定作業の模倣で重要な**関連する非VLA方策**である。modelをどのrepositoryやCLIで学習・推論するかは別の選択となる。[07](07_vla_model_selection.md)で候補を選び、[08](08_vla_training_inference.md)でLeRobot版VLAの学習とオフライン推論、[09](09_openvla_oft_data_bridge.md)でOpenVLA-OFTへのデータ接続を試す。収録したデータを実機で動く方策へ仕上げるには、追加の学習と安全な評価が要る。
 
 ## 6. 別の構成を調べるときの見方
 

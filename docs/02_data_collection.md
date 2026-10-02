@@ -101,7 +101,7 @@ uv --version
 GitHubから取得する場合は次を実行する。
 
 ```bash
-git clone https://github.com/26Taku/aloha-vla-reference.git
+git clone https://github.com/KawaharaLab/aloha-vla-reference.git
 cd aloha-vla-reference
 ./setup.sh
 ```
@@ -119,6 +119,19 @@ ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirec
 - `lerobot_trossen`のcommitが`a4336933f34192a3daa7e9fb52674284bb5ae48e`である。
 
 ここで失敗した場合は[04のsetup・dependency](04_troubleshooting.md)を確認する。
+
+`The current Python version ... is not compatible with ... ==3.12.*`と出た場合だけ、`uv`がこの教材の固定版と異なるPythonを選んでいる。system Pythonを変更せず、取得済みの`lerobot_trossen`で3.12を指定してから`./setup.sh`を再実行する。
+
+```bash
+cd lerobot_trossen
+uv python install 3.12
+uv sync --python 3.12 --frozen
+uv run python --version
+cd ..
+./setup.sh
+```
+
+正常にセットアップできた人には、この回復操作は不要である。Pythonの依存lockをエラー回避のために更新しない。
 
 ## Step 2: 4台のArmを見分ける
 
@@ -376,7 +389,7 @@ git check-ignore -v config/hardware-local.yaml
 | `1` | episode数 |
 | `10` | 1 episodeの秒数 |
 
-収録中は、練習時と同じ安全確認を行い、急がず一つの作業を完了する。同名Datasetが既にある場合は上書きせず停止する。
+収録中は、練習時と同じ安全確認を行い、急がず一つの作業を完了する。同名Datasetが既にある場合は上書きせず停止する。1 episodeだけの場合はepisode間のresetはない。
 
 ### 何が保存されるか
 
@@ -448,6 +461,21 @@ validatorは、Dataset version、frame数、timestampの増加、action/stateの
 - versionやhardwareを変更する: [05 保守と更新](05_maintenance.md)
 - 自分の数値を実測例と比較する: [06 実機検証結果と正常性の判断](06_validation_results.md)
 - 外部sensor用scriptの引数を確認する: [Custom Sensor Script Reference](../examples/custom_sensor/README.md)
+
+### 08・09のVLA実習へ進む人：共通のデモを収録する
+
+ここまでの`first_demo`は、**機器と保存形式を確認するための1 episode**だった。続くVLA実習では、同じロボットと画角で成功したデモを少し増やし、別名の`aloha_vla_demo`として収録する。以後[08](08_vla_training_inference.md)と[09](09_openvla_oft_data_bridge.md)は、この名前を共通の入力例に使う。
+
+ブロックをトレイへ置く作業を続ける場合の実行例は次のとおり。各回を同じ状態から始め、動作が20秒以内で完了するよう練習してから開始する。作業に必要な時間が異なるなら秒数を先に決め直す。
+
+```bash
+./record.sh aloha_vla_demo "Move the block to the tray." 10 20
+./validate_dataset.sh data/aloha_vla_demo
+```
+
+episode間には`config/record-template.yaml`の`reset_time_s: 10`で10秒のreset時間を設ける。この間の操作はデモとして記録しない。収録が一回終わったら、ブロックを開始位置へ戻し、トレイを空にし、左右のLeaderとFollowerの姿勢、両グリッパの開閉を次の開始条件へ戻す。**収録ソフトがアームを自動で最初の姿勢へ戻すと仮定しない。** アームの操作可否はreset phase中の画面と実機の挙動で確認し、無理に手でFollowerを動かさない。次のepisode開始前に4視点で対象物とアームの状態を確かめる。毎回10秒で安全に戻せない場合は収録前に`reset_time_s`を延ばす（実例では15秒を使用）。収録途中で時間が不足したら、その回の開始状態を記録し、必要なら取り直す。
+
+**10 episodeは学習処理を通すための教材例で、十分な模倣性能を得るための推奨量ではない。** 各回の動画を見て、ブロックがトレイに置かれ、指示文と実演が一致することを確認する。失敗が混じった場合は元データを残し、[08のデータ選別](08_vla_training_inference.md#1-実習用データと運用時のデータ選別)を参考に採用するepisodeを判断する。同じ名前で`record.sh`を再実行すると上書きせず停止するため、追加収録は別のdataset名にする。収録を増やすより先に、最初の10回の内容を確認する。
 
 ## 11. 公式資料
 

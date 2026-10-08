@@ -246,7 +246,13 @@ ros2 topic echo "$SENSOR_TOPIC" --once
 ros2 topic hz "$SENSOR_TOPIC"
 ```
 
-例えば、調べたいtopicが`/force_torque/left`なら、実際の入力は次のようになる。
+問いが出たら、一覧で確認したtopic名を入力してEnterを押す。例えば次のようになる。
+
+```text
+確認するROS 2 topic: /force_torque/left
+```
+
+この入力により、後続は次のコマンドと同じ内容になる。
 
 ```bash
 ros2 topic type /force_torque/left
@@ -275,7 +281,13 @@ read -r -p "確認するcamera device: " DEVICE
 v4l2-ctl --device "$DEVICE" --list-formats-ext
 ```
 
-例えば一覧にGelSight Miniのcandidateとして`/dev/video6`が表示されたなら、実際の入力は次のようになる。
+例えば一覧にGelSight Miniのcandidateとして`/dev/video6`が表示されたなら、問いへ次のように入力してEnterを押す。device番号は自分の一覧で確認したものを使う。
+
+```text
+確認するcamera device: /dev/video6
+```
+
+この入力により、後続は次のコマンドと同じ内容になる。
 
 ```bash
 v4l2-ctl --device /dev/video6 --list-formats-ext

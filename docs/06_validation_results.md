@@ -1,6 +1,15 @@
-# 06 実機検証結果と正常性の判断
+# 06 収録・センサ同期の検証結果と正常性の判断
 
 この章は、自分の環境で得た結果を解釈するための比較資料である。[02](02_data_collection.md)と[03](03_architecture_and_extension.md)に記載した手順を実機で実行したとき、どのような値と挙動が得られたかを示す。
+
+本章は収録・センサ同期の検証を扱う。学習済みpolicyのタスク結果は含めず、次の資料へ分ける。
+
+| 確認したい経路 | 結果の参照先 |
+|---|---|
+| 操作・収録・外部センサ同期 | 本章 |
+| LeRobot版SmolVLA・π₀.₅の学習とオフライン推論 | [08 第7節](08_vla_training_inference.md#7-追加学習とcheckpointを比較する) |
+| OFTの全件変換・短い学習・checkpoint推論 | [09 第5節](09_openvla_oft_data_bridge.md#5-全episodeから短い学習保存推論まで通す) |
+| 学習済みpolicyの実機接続とタスク動作 | [11](11_robot_policy_execution.md) |
 
 数値を完全に一致させる必要はない。PC負荷、収録時間の境界、USB構成、sensor設定によって変動する。次のように使う。
 
@@ -227,7 +236,7 @@ validatorがPASSでも、4と5は利用者が評価する必要がある。逆�
 - 別hardware、firmware、OSでのdriver互換性
 - hardware-trigger levelやsub-millisecondの同期
 - 複数PC間のclock synchronization
-- VLA modelの学習・推論性能
+- 本章の収録・同期の数値から判断するVLAの学習・タスク性能。学習・推論の確認は08・09、実機policyの結果は11に分けて記録する
 
 ここで使用した同期は、同一PCのmonotonic clockを基準にしたsoftware-level alignmentである。より厳密な同期が必要なら、hardware trigger、共有clock、PTPなどを要件から設計する。
 

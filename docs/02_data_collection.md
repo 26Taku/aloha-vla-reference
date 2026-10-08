@@ -56,7 +56,7 @@ flowchart LR
 ### 作業前の安全確認
 
 - Follower Armの周囲から、人、工具、配線、壊れやすい物を退避する。
-- Armを大きく動かす前に、停止方法が`Ctrl+C`であることを確認する。
+- Armを大きく動かす前に、現地の装置で使える停止手段と操作方法を確認する。`Ctrl+C`はプログラムの終了操作であり、即時停止とは異なる。固定版のFollowerは接続時・終了時にも所定姿勢へ移動するため、その経路と周辺空間も確認する（[11の開始・終了動作](11_robot_policy_execution.md)）。
 - 起動直後はFollowerが追従し始めるまでLeaderを現在位置付近で保持する。
 - error後にControllerの電源を切る場合は、保持力を失うArmを手で支持する。
 - 不明な挙動を繰り返して確認せず、停止して[04 Troubleshooting](04_troubleshooting.md)で切り分ける。
@@ -80,6 +80,10 @@ ArmにIP addressがあるのは、ControllerがEthernet network上の機器だ�
 
 - ArmはEthernet/IP、RealSenseはUSB/serialで識別する、と説明できる。
 - PC、Ethernet switch、4台のController、4台のcameraが物理的に接続されている。
+
+### 関節・gripperの校正を扱う前提
+
+固定した[Trossen Follower実装](https://github.com/TrossenRobotics/lerobot_trossen/blob/a4336933f34192a3daa7e9fb52674284bb5ae48e/packages/lerobot_robot_trossen/src/lerobot_robot_trossen/widowxai_follower.py)では、`is_calibrated`は常に真を返し、`calibrate()`には処理がありません。このプラグインに、汎用ロボットの校正ファイルを生成する手順を追加する必要はありません。ただし、これは機体のゼロ点・取り付け・gripperの機械的な調整が正しいことを測定する機能ではありません。ハードウェアの調整は対象機体の公式手順に従い、独自のオフセットや単位変換を加える場合は収録と推論で同じ設定を使って記録してください。
 
 ## Step 1: Software environmentを準備する
 
@@ -189,7 +193,13 @@ eno1    UP    192.168.1.1/24
 )
 ```
 
-問いが表示されたら、`discover`で表示された実際のIPを入力する。`identify`ではgripperが動くため、指や工具を近づけない。動いたArmを見て、次の表を自分の値で埋める。
+問いが表示されたら、`discover`で表示された実際のIPを入力してEnterを押す。入力例は次のようになる。例のIPをそのまま使わず、自分の`discover`の結果を使う。
+
+```text
+確認するArmのIP address: 192.168.1.5
+```
+
+`identify`ではgripperが動くため、指や工具を近づけない。動いたArmを見て、次の表を自分の値で埋める。
 
 | 物理的な役割 | 確認したIP address |
 |---|---|
@@ -370,7 +380,7 @@ git check-ignore -v config/hardware-local.yaml
 - 4画面が、上方・低位置・左右手首の正しい画角である。
 - 不自然な振動、急な移動、連続errorがない。
 
-終了は`Ctrl+C`で行う。
+通常のプログラム終了は`Ctrl+C`で行う。終了処理にもアームの移動を伴うため、周辺空間を確保してから操作する。危険時の即時停止には、事前に確認した装置の停止手段を使う。
 
 ### なぜ起動直後に待つのか
 
@@ -380,7 +390,7 @@ git check-ignore -v config/hardware-local.yaml
 
 - 左右の対応と4画面が正しい。
 - 小さな操作にFollowerが滑らかに追従する。
-- `Ctrl+C`後に正常に終了する。
+- `Ctrl+C`後の終了時移動を経て、正常に終了する。
 
 検証環境ではcontrol loopが概ね30 Hzだった。挙動の比較は[06のteleoperation](06_validation_results.md)を参照する。
 

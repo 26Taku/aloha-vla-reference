@@ -6,7 +6,7 @@
 
 この章は、通常フローが途中で止まったときに、原因がありそうな層を一つずつ調べるために使う。
 
-通常の実行順序は[02 最初のデータを収録する](02_data_collection.md)を参照する。
+収録までの通常フローは[02](02_data_collection.md)、学習・推論は[08](08_vla_training_inference.md)・[09](09_openvla_oft_data_bridge.md)、実機接続の差分は[11](11_robot_policy_execution.md)を参照する。
 
 Troubleshootingでは、error messageだけを検索する前に「どの層まで正常か」を確認する。
 
@@ -90,7 +90,7 @@ ip -br addr
 )
 ```
 
-対象IPへの到達性を個別に確認する場合:
+対象IPへの到達性を個別に確認する場合、問いへ`discover`で確認したIPを入力してEnterを押す。例えば入力は`確認するArmのIP address: 192.168.1.5`となる。例のIPを自分の装置の値へ置き換える。
 
 ```bash
 read -r -p "確認するArmのIP address: " ARM_IP
@@ -269,3 +269,19 @@ raw imageは複製せずmappingを保存する。
 source/device timestampとhost `CLOCK_MONOTONIC` のclock domainを確認する。
 
 ここで扱うsoftware alignmentではhost monotonic timestampを基準とする。別hardware / driverへ変更した場合は対象timestampのsemanticsを確認する。
+
+## 20. 学習・モデル推論・実機policyの問題
+
+収録用環境、モデル推論用環境、OFT専用環境では依存が異なる。まず、失敗したcommandが実際に使ったPython・追加依存・checkpointを記録する。別環境のpackage一覧だけで原因を判断しない。
+
+| 症状 | 切り分けるもの | 詳細 |
+|---|---|---|
+| 学習開始前にimport・認証・統計で停止 | モデルextra、accelerate、利用条件・認証、state/actionの統計 | [08](08_vla_training_inference.md) |
+| OFTの変換・loaderで停止 | builder/OFTのPython、RLDS出力、mixture登録、固定commitとpatch | [09](09_openvla_oft_data_bridge.md) |
+| checkpointがあっても基盤重み・tokenizerを探す | 前後処理と基盤cache、参照revision、cache内symlink | [11の環境差分](11_robot_policy_execution.md#2-ロボットを動かす前に準備する) |
+| 非同期server/clientでgrpc等のimportが失敗 | 両方の実行環境に非同期依存があるか | [11](11_robot_policy_execution.md) |
+| 実機で同じ動作を繰り返す、目標がclampされる | 予測actionと切り詰め後の指令、単位、実効の関節別上限、観測類似判定 | [11の設定差分](11_robot_policy_execution.md#4-同じ場所を繰り返すときの診断) |
+| 把持後に落下、受け渡しに失敗 | 初期配置、把持の深さ、接触、前後処理、実行条件。出力finiteだけでは判定しない | [11の試行結果](11_robot_policy_execution.md#5-試行を記録し成功を定義する) |
+| Ctrl+C後にもarmが移動 | client終了・driver disconnectの姿勢移動。即時停止とは区別する | [11](11_robot_policy_execution.md) |
+
+実機で激しい動作がある場合、指令上限を広げて反復することを対処法にしない。確認済みの停止手段を使い、入力・出力・設定を照合してから次の試行を判断する。原因と対処の具体的な記録は各実習章に置き、本章は問題の入口として使う。

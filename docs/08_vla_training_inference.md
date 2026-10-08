@@ -1,11 +1,11 @@
 # 08 自分で収録したデータから学習・オフライン推論へ
 
-[02 データ収集](02_data_collection.md)で得た**自分のLeRobotDataset v3**を、まず検証し、次にVLAの入力へ渡します。02の最後で収録した`data/aloha_vla_demo`を本章と[09](09_openvla_oft_data_bridge.md)の共通例にします。[07](07_vla_model_selection.md)はモデル選定の教材です。この章はLeRobot版π₀.₅の主実習と、SmolVLAの軽量な第二実習です。どちらも学習後の重みを別プロセスで読み、収録済み観測からactionを出すところまで扱います。この章ではロボットへの指令送信は扱いません。
+[02 データ収集](02_data_collection.md)で得た**自分のLeRobotDataset v3**を、まず検証し、次にVLAの入力へ渡します。02の最後で収録した`data/aloha_vla_demo`を本章と[09](09_openvla_oft_data_bridge.md)の共通例にします。[07](07_vla_model_selection.md)はモデル選定の教材です。この章はLeRobot版π₀.₅の実習AとSmolVLAの実習Bです。実機成功例を入口にする場合は第3節のSmolVLAから始められます。実習の掲載順は性能順位ではありません。どちらも学習後の重みを別プロセスで読み、収録済み観測からactionを出すところまで扱います。この章ではロボットへの指令送信は扱いません。
 
 データは各自が[02](02_data_collection.md)で収録したものを使います。`first_demo`は収録確認用、`aloha_vla_demo`は以後の学習・推論に使うデモです。episode数は成功率の目標値ではありません。最初の3-step学習は経路の確認で、技能の獲得を測るものではありません。
 
 
-> **動作確認の範囲**：SmolVLAとLeRobot版π₀.₅は、収録済みデータによる短い学習・checkpoint再読込・オフライン推論を確認しています。Ubuntu 22.04.5のRTX A6000ワークステーションで、教材の新規取得とPython 3.12.13の仮想環境作成後、版指定したコマンドでπ₀.₅の3-step、SmolVLAの3・200-step学習からcheckpoint再読込・オフライン推論まで再確認しました。既存OS・uv・認証・キャッシュは利用しており、OSを含むクリーン環境の検証ではありません。タスク成功率と学習済みpolicyによる実機動作は評価していません。
+> **動作確認の範囲**：SmolVLAとLeRobot版π₀.₅は、収録済みデータによる短い学習・checkpoint再読込・オフライン推論を確認しています。Ubuntu 22.04.5のRTX A6000ワークステーションで、教材の新規取得とPython 3.12.13の仮想環境作成後、版指定したコマンドでπ₀.₅の3-step、SmolVLAの3・200-step学習からcheckpoint再読込・オフライン推論まで再確認しました。既存OS・uv・認証・キャッシュは利用しており、OSを含むクリーン環境の検証ではありません。その後の20K checkpointを使った実機接続とタスク結果は[11](11_robot_policy_execution.md)に記録しています。短い学習の性能評価と、未構築環境から実機までの一括再現はしていません。
 
 ### 収録済みデータを別の学習PCで使う
 
@@ -44,9 +44,17 @@ read -r -p "学習結果の保存先ディレクトリ: " OUTPUTS
 export OUTPUTS
 ```
 
-保存先の指定も、表示された問いにパスを入力してEnterを押します。入力待ちの間に次のコマンドをパスとして入力しないようにしてください。
+保存先の入力例は`学習結果の保存先ディレクトリ: /mnt/data/aloha_outputs`です。表示された問いにパスを入力してEnterを押します。入力待ちの間に次のコマンドをパスとして入力しないようにしてください。
 
 入力した値は同じ端末で08・09へ引き継ぎます。`session.sh`を再度sourceしても保持されます。新しい端末では作業場所の設定後、この節で入力先・保存先を指定し直してください。
+
+## 学習ログを保存する
+
+以下の学習コマンドは付属の`run_with_log.sh`を経由し、端末への表示と同時に`$OUT.log`へ標準出力・標準エラーを保存します。モデルの保存先`$OUT`とは別のファイルなので、LeRobotが新規出力先を要求する条件を変えません。例えば`$OUT`が`outputs/smolvla_4cam_tutorial_200steps`なら、ログは`outputs/smolvla_4cam_tutorial_200steps.log`です。
+
+ログには開始・終了のUTC時刻と終了コードも残します。学習側またはログ書込みが失敗すれば、コマンドも失敗として終了します。同名ログが既にあると上書きせず停止するので、新しい実験には別の`OUT`を指定します。学習の引数・環境・作業場所は変えません。
+
+checkpointには重み・学習設定・再開用状態が保存されますが、loss履歴の自動保存とは別です。W&Bを無効にした場合もこのログは残ります。tmuxはSSH切断後の継続に使い、ログ保存と併用します。学習後はログの終了コードと`End of training`、checkpoint生成、別プロセス再読込を確認してください。新しい端末では作業場所とDatasetを指定し直します。
 
 ## まず自分のdatasetを確認する
 
@@ -168,7 +176,7 @@ GPUの空きメモリは`nvidia-smi`で確認します。次の例はbatch 1、B
 cd "$REPO/lerobot_trossen"
 OUT="$OUTPUTS/pi05_4cam_smoke"
 
-uv run --with 'lerobot[pi]==0.6.0' --with accelerate==1.15.0 lerobot-train \
+bash "$REPO/scripts/run_with_log.sh" "$OUT.log" uv run --with 'lerobot[pi]==0.6.0' --with accelerate==1.15.0 lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
   --dataset.root="$DATASET" \
   --policy.type=pi05 \
@@ -249,7 +257,7 @@ cd "$REPO/lerobot_trossen"
 
 OUT="$OUTPUTS/smolvla_4cam_smoke"
 
-uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
+bash "$REPO/scripts/run_with_log.sh" "$OUT.log" uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
   --dataset.root="$DATASET" \
   --policy.path=lerobot/smolvla_base \
@@ -275,7 +283,7 @@ smoke runが通ったら、短い教材学習を実行します。ここでは20
 ```bash
 OUT="$OUTPUTS/smolvla_4cam_tutorial_200steps"
 
-uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
+bash "$REPO/scripts/run_with_log.sh" "$OUT.log" uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
   --dataset.repo_id="local/$(basename "$DATASET")" \
   --dataset.root="$DATASET" \
   --policy.path=lerobot/smolvla_base \
@@ -290,7 +298,7 @@ uv run --with 'lerobot[smolvla]==0.6.0' lerobot-train \
   --num_workers=0
 ```
 
-π₀.₅の主実習に続く、再現用の**小さな学習演習**です。標準的な収束条件や十分な性能を示すものではありません。ステップ数だけを増やしても、データの多様性、評価設計、行動表現の不一致は解決しません。
+データから学習・保存・再読込まで接続する、再現用の**小さな学習演習**です。標準的な収束条件や十分な性能を示すものではありません。ステップ数だけを増やしても、データの多様性、評価設計、行動表現の不一致は解決しません。
 
 ### 3.3 チェックポイントを読み戻し、オフライン推論する
 
@@ -346,7 +354,7 @@ PYCODE
 
 このスクリプトはチェックポイントを再ロードし、指定したdatasetの最初の観測フレームを4画像・state・タスク文のバッチにして推論します。4カメラとstateが入力になり、action `(1, 14)` の有限値を返すことを確かめます。この観測は学習にも使ったデータなので、未知条件での評価にはなりません。正しい軌道を予測すること、ブロックをトレイに置けること、物理的に安全な制御であることは確認していません。
 
-> **安全境界**：オフライン推論で得たactionを、そのままロボットに送ってはいけません。実機実行には、ロボット用環境・カメラ入力・関節順序・単位・action chunkの実行方法・速度や範囲の制限・非常停止を確認する別のデプロイ手順が必要です。本章のオフライン推論は実機ポリシー実行を含みません。
+> **安全境界**：オフライン推論で得たactionを、そのままロボットに送ってはいけません。実機実行には、ロボット用環境・カメラ入力・関節順序・単位・action chunkの実行方法・速度や範囲の制限・非常停止を確認する別のデプロイ手順が必要です。本章のオフライン推論は実機ポリシー実行を含みません。実機で確認した接続・調整・終了動作は[11](11_robot_policy_execution.md)を参照してください。
 
 ## 4. センサ収録から研究へ
 
@@ -368,7 +376,25 @@ PYCODE
 
 ## 5. 実機推論へ進むとき
 
-本章のチェックポイントから数値のactionが出ても、実機で繰り返し閉ループ制御できたことにはなりません。[Trossen公式の学習・評価](https://docs.trossenrobotics.com/trossen_arm/main/tutorials/lerobot_plugin/train_and_evaluate.html)および[非同期推論](https://docs.trossenrobotics.com/trossen_arm/main/tutorials/lerobot_plugin/async_inference.html)を参照し、利用するロボットの接続、4カメラの対応、task文、前後処理、関節順序・単位・指令範囲、停止手段を一つずつ確認します。最初は物体や周辺との接触を避けられる条件から始めます。本教材の実習はオフライン推論までです。実機実行は各自の装置で公式手順を確認してから進めます。
+本章のチェックポイントから数値のactionが出ても、実機で繰り返し閉ループ制御できたことにはなりません。[Trossen公式の学習・評価](https://docs.trossenrobotics.com/trossen_arm/main/tutorials/lerobot_plugin/train_and_evaluate.html)および[非同期推論](https://docs.trossenrobotics.com/trossen_arm/main/tutorials/lerobot_plugin/async_inference.html)を参照し、利用するロボットの接続、4カメラの対応、task文、前後処理、関節順序・単位・指令範囲、停止手段を一つずつ確認します。最初は物体や周辺との接触を避けられる条件から始めます。SmolVLAとLeRobot版π₀.₅の20K checkpointによる実機動作は[11](11_robot_policy_execution.md)で確認した条件と結果を記録しています。自分の装置では公式手順と11の差分を照合してから進めます。
+
+固定版の[robot client](https://github.com/huggingface/lerobot/blob/v0.6.0/src/lerobot/async_inference/robot_client.py)は初期化でロボットへ接続します。[Trossen follower](https://github.com/TrossenRobotics/lerobot_trossen/blob/a4336933f34192a3daa7e9fb52674284bb5ae48e/packages/lerobot_robot_trossen/src/lerobot_robot_trossen/widowxai_follower.py)は接続時に所定姿勢へ移動し、終了時にも所定姿勢とsleep位置へ移動します。接続や終了だけの確認にも動作を伴うため、開始・終了姿勢と周辺空間を確認します。`max_relative_target`は現在位置からの目標差を制限するもので、絶対位置の制限や衝突回避ではありません。関節とgripperで単位が異なり、初期化・終了の移動も別経路なので、公式例の単一数値を安全値として流用しません。
+
+実機では次の順に確認し、設定変更と結果を記録します。
+
+1. checkpointの前後処理、Datasetのfeature名、実機のカメラ名・配置、関節順・単位・絶対位置か差分かを照合する。
+2. GPUの現在の空きとモデル読込、観測取得、推論時間、chunkの実行方法と停止手段を確認する。まず実機側PCでの推論経路を検討し、別PCを使う場合は通信遅延・欠損・切断時の挙動も測る。
+3. 接続・開始・停止・終了の動作を段階的に確かめてから、対象物を使う試行へ進む。観測や推論が停止したときの挙動を確認する。
+4. タスクの成功条件、初期配置、終了条件、試行数を先に決め、成功・失敗・途中停止/介入と動画・ログを残す。モデルごとに条件を揃える。
+
+| 記録項目 | 内容 |
+|---|---|
+| 実行条件 | model・checkpoint・commit、GPU、学習step/batch、Dataset、カメラ、fps、chunk実行長 |
+| 試行条件 | 対象物の初期位置、指示文、開始姿勢、成功条件、終了条件 |
+| 結果 | 成功数/試行数、停止/介入数、失敗の種類、動画・ログ |
+| 実行系の違い | 初回/継続時の推論時間、画像取得不足、設定変更と理由 |
+| 評価の限界 | 同一配置だけか、新配置や指示文切替を含むか |
+
 
 ## 6. 実習を終えて次へ進む
 
@@ -379,6 +405,105 @@ PYCODE
 3. **オフライン推論**：別プロセスで保存したpolicyと前後処理を読み、指定した観測から想定した次元の有限値のactionを得られる。学習に使ったデータを再利用した場合は、未知条件での評価とは呼ばない。
 
 ここまで進んだら、[07の選定例](07_vla_model_selection.md)から自分の問いに近い候補を選びます。言語指示の切替え、追加センサ、行動生成法の改良では、次に変更する場所が異なります。実機で動かす場合は第5節の公式経路へ進み、ロボット側の入力とactionの意味を確かめます。**数値のactionが出たことだけではタスク成功や安全な実機動作は分かりません。**
+
+## 7. 追加学習とcheckpointを比較する
+
+### 7.1 追加確認した条件
+
+2026年10月5日、50 episode・29,947 frame・30 Hz、4画像、14次元state/actionの収録データを使い、SmolVLAをbatch 8・20,000 stepで学習しました。学習ループは3時間18分44秒、ログ上160K sample・5.34 epoch、最終表示lossは0.040でした。これは1台のRTX A6000で得た実測例で、他のGPUの必要時間やタスク成功の保証ではありません。
+
+保存した`checkpoints/020000/pretrained_model`を別プロセスで読み直し、10 episodeから先頭・中間・末尾の計30観測を独立に推論し、有限な`(1,14)`を確認しました。下の補助コードの推論区間は初回0.712秒、その後0.177〜0.184秒でした。毎回`policy.reset()`する計測のため、実機の制御周期やchunk消費速度と同一ではありません。30観測の4視点画像を目視し、CSVの全420行の有限値・差分と、比較するcheckpoint間で収録action/stateが一致することも確認しました。画像の低位置視点では箱による遮蔽が多く見られます。視点ごとの性能への寄与と実機対応は別の検証項目です。
+
+2026年10月6日、π₀.₅のbatch 8・20K stepのcheckpoint保存と、同じ30観測での別プロセス再読込・有限な`(1,14)`を確認しました。推論区間は初回0.534秒、以降の29観測の中央値は0.251秒でした。学習完了と所要時間約18時間は実行者からの報告です。当時W&Bが無効で端末出力も保存していなかったため、正確な開始・終了時刻、最終lossとloss履歴は未記録です。SmolVLAのログや曖昧なlossの記憶から補いません。約18時間はSmolVLAのログで測った学習ループ時間とは計測精度が異なり、厳密な速度比較には使いません。以後の学習は本章のログ保存手順を使います。
+
+### 7.2 追加学習のcheckpointを11へ渡す
+
+3-step・200-stepは実行経路の確認です。今回の実機評価には20K checkpointを使いました。新しく同じ学習予算を使う場合は、次の組立例を使えます。既存checkpointを使う場合は学習し直さず、11のStep 1で参照先を指定します。学習時間の実測例は7.1、条件と性能評価の限界は11を参照してください。
+
+次の例は第7.1節の20K学習条件に合わせたものです。学習条件の実行実績はありますが、このコマンド列そのものの20K実行は未確認です。最初に短い学習を通し、保存設定を照合してから長い学習へ進みます。SSHを切る予定がある場合は、事前にtmux等の切断後も残る端末を使います。
+
+```bash
+export POLICY_TYPE=smolvla
+cd "$REPO/lerobot_trossen"
+OUT="$OUTPUTS/${POLICY_TYPE}_4cam_20k"
+test ! -e "$OUT"
+case "$POLICY_TYPE" in
+  smolvla)
+    RUN_DEPS=(--with 'lerobot[smolvla]==0.6.0')
+    POLICY_ARGS=(--policy.path=lerobot/smolvla_base
+      --policy.input_features=null
+      '--policy.output_features={"action":{"type":"ACTION","shape":[14]}}'
+      --policy.freeze_vision_encoder=true --policy.train_expert_only=true
+      --policy.train_state_proj=true)
+    ;;
+  pi05)
+    RUN_DEPS=(--with 'lerobot[pi]==0.6.0' --with accelerate==1.15.0)
+    POLICY_ARGS=(--policy.type=pi05 --policy.pretrained_path=lerobot/pi05_base
+      --policy.dtype=bfloat16 --policy.gradient_checkpointing=true
+      --policy.freeze_vision_encoder=true --policy.train_expert_only=true
+      --policy.use_relative_actions=false)
+    ;;
+  *) printf 'Unsupported policy: %s\n' "$POLICY_TYPE"; exit 2 ;;
+esac
+bash "$REPO/scripts/run_with_log.sh" "$OUT.log" \
+  uv run "${RUN_DEPS[@]}" lerobot-train \
+  --dataset.repo_id="local/$(basename "$DATASET")" --dataset.root="$DATASET" \
+  "${POLICY_ARGS[@]}" --policy.device=cuda --policy.push_to_hub=false \
+  --output_dir="$OUT" --job_name="${POLICY_TYPE}_4cam_20k" \
+  --steps=20000 --batch_size=8 --num_workers=0 --seed=1000 --save_freq=2000
+```
+
+π₀.₅を使う場合だけ、先頭の`POLICY_TYPE`を`pi05`にします。GPU指定とbatchは利用可能な資源に合わせて選び、変更した条件を記録します。20Kやbatch 8はタスク成功を保証する値ではありません。
+
+学習終了後は、次の場所にcheckpoint一式が保存されています。モデル設定と学習設定が存在することを確認します。
+
+```bash
+CHECKPOINT="$OUT/checkpoints/020000/pretrained_model"
+test -f "$CHECKPOINT/config.json" &&
+test -f "$CHECKPOINT/train_config.json" &&
+printf '学習済みcheckpoint: %s\n' "$CHECKPOINT"
+```
+
+| `POLICY_TYPE` | 本節の出力先 | 11が使うcheckpoint |
+|---|---|---|
+| `smolvla` | `$OUTPUTS/smolvla_4cam_20k/` | 同ディレクトリの`checkpoints/020000/pretrained_model/` |
+| `pi05` | `$OUTPUTS/pi05_4cam_20k/` | 同ディレクトリの`checkpoints/020000/pretrained_model/` |
+
+**同じPCで本節から11へ進む場合、フォルダ名の変更・コピー・パスの再入力は不要です。** 11の`policy_session.sh`が上表の場所を設定します。第2・3節の短い学習だけで終えた場合は、この20K checkpointはまだ作成されていません。十分に学習したモデルを用意してから実機へ進みます。
+
+日付などを付けた別名の学習結果も、そのまま利用できます。11のStep 1で`pretrained_model`の参照先を一度指定してください。`last`は最新保存checkpointへの参照、`020000`は20K stepを明示した保存先です。条件を固定して比較する際はstepを明示します。
+
+別PCで推論する場合は、`pretrained_model`ディレクトリ全体と必要な基盤キャッシュを転送します。移動先が標準の参照先と異なる場合も、11で一度指定すれば使えます。11ではcheckpointのtype、画像feature、関節順序・単位、action表現と前後処理を照合します。
+
+### 7.3 同じ観測で保存モデルを確認する
+
+第2・3節で保存したモデルや追加学習のcheckpointを指定します。次の`CHECKPOINT`には`pretrained_model`ディレクトリを、`INSPECTION`には未使用の出力先を入力します。問いが表示されるたびにパスを入力し、Enterを押します。例えば追加学習後のSmolVLAなら、次のような入力になります（保存先は自分の環境のものを使います）。
+
+```text
+確認するpretrained_modelディレクトリ: /home/student/aloha-vla-reference/outputs/smolvla_4cam_20k/checkpoints/020000/pretrained_model
+観測確認の新規出力ディレクトリ: /home/student/aloha-vla-reference/outputs/smolvla_inspection_20k
+```
+
+```bash
+read -r -p "確認するpretrained_modelディレクトリ: " CHECKPOINT
+read -r -p "観測確認の新規出力ディレクトリ: " INSPECTION
+export CHECKPOINT INSPECTION
+cd "$REPO/lerobot_trossen"
+uv run --with 'lerobot[smolvla]==0.6.0' python \
+  "$REPO/scripts/inspect_lerobot_checkpoint.py" \
+  --policy smolvla --dataset "$DATASET" \
+  --checkpoint "$CHECKPOINT" --output "$INSPECTION" --episodes 10
+```
+
+**完了条件**：`RECORDED-FRAME CHECK: PASS`と、画像・`actions.csv`・`summary.json`の生成。このコードはCUDAを使い、最大10 episodeを均等に選び、各3観測で推論します。出力先が既にあると停止します。π₀.₅用には`--policy pi05`と`uv run --with 'lerobot[pi]==0.6.0' --with accelerate==1.15.0`を使います。この補助コードはSmolVLAの2K・20Kとπ₀.₅の20Kで実行し、各30観測のPASSを確認しています。
+
+画像ではカメラの視点・左右・色を確認します。CSVには関節ごとの予測、収録action、現在state、その差と推論時間を残します。関節はrad、gripperはmというように単位が異なるため、混ぜた未正規化の平均誤差をモデル順位に使いません。確認した値域も、そのまま実機の安全な指令範囲とはみなしません。例えばSmolVLA 20Kでは右gripperに約−0.929 mm、π₀.₅20Kでは約−0.510 mmの予測が含まれました。有限値のPASSとは別に、実機の可動範囲とdriverの指令制限を照合します。
+
+### 7.4 checkpointで言えること・実機で確かめること
+
+同じepisode・frame・task文を使い、例えば2Kと20Kのcheckpointを別の出力先へ読み直すと、学習量に伴う出力や計算時間の変化を確認できます。確認例では、同じ30訓練観測上のSmolVLAの関節ごとの平均絶対誤差は、2Kから20Kへ全14次元で小さくなりました。これは訓練観測への適合の例で、実機性能が改善した証拠ではありません。2K checkpointも同じ全Datasetからsampleを読むため、「少ないepisodeだけで学習したモデル」の代用にはなりません。5・10・25・50 episodeのデータ量比較には、独立したsubset学習と固定評価セットが必要です。
+
+SmolVLAとπ₀.₅を同じデータ・batch 8・20K stepで試す場合は、同じ160K sampleの学習予算による導入比較として扱います。loss、正規化、更新対象の重み、optimizerが異なるので、lossの絶対値だけで優劣を決めません。訓練観測の誤差は未知条件での性能を示さず、閉ループの滑らかさ、修正行動、介入、タスク成功は実機で確認します。今回の実機結果と限界は[11](11_robot_policy_execution.md)を参照してください。単一タスク・一つの指示文の確認から、言語理解や汎化全般を主張しません。
 
 ## 参考資料
 

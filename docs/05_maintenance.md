@@ -186,3 +186,20 @@ flowchart TD
 external sensor codeを変更した場合は、対象sensorのnative acquisition、timestamp semantics、concurrent acquisition、causal alignmentも確認する。
 
 結果は[06](06_validation_results.md)と同じ指標を用い、project-specificな実験記録へ残す。
+
+## 11. 学習・推論環境とpolicy設定を変更する場合
+
+収録用環境を保持して学習・推論用環境を分ける場合、環境ごとにPython、LeRobot、PyTorch/CUDA、追加依存、source revisionを記録する。学習用PCと実機用PCが別でも、checkpointと前後処理、基盤cache、観測の意味が一致することを確認する。[08](08_vla_training_inference.md)・[09](09_openvla_oft_data_bridge.md)の確認条件と[11](11_robot_policy_execution.md)の実機差分を基準にする。
+
+| 変更 | 再確認する経路 |
+|---|---|
+| モデルextra・PyTorch/CUDA・tokenizer | 依存検査→モデル読込→非接続の推論。学習に使うなら短い学習・保存・再読込も確認 |
+| Datasetのfeature・正規化・action表現 | loader→前後処理→学習→checkpoint再読込。推論時も同じ入力と復元処理を使う |
+| カメラ名・関節順序・単位 | 収録とcheckpointの対応→非接続の推論→対象機体での段階的な接続確認 |
+| chunk・aggregation・観測類似判定・指令上限 | 実行時の適用値を保存し、実機の開始・終了動作と対象タスクを確認 |
+
+checkpointだけでなく、train_config、policy前後処理、Datasetの版、実行commandとログを保持する。学習loss履歴はcheckpointとは別に[08のログ保存](08_vla_training_inference.md#学習ログを保存する)を使う。
+
+11の関節別制限は実行時にfactoryを上書きしたもので、YAMLだけでは適用値が残らない。上書きコードと実行時の表示を併せて記録する。版変更後に同じfactory・configへ適用できるとは仮定しない。動作表現を変更した場合、推論時だけ設定を切り替えて旧checkpointを使わない。
+
+11のパス設定は`policy_session.sh`から読み込み、必要な上書きは`.runtime/policy-local.sh`やモデル別の`.runtime/policy-checkpoint-<モデル名>.sh`に保存できる。GPUは11のStep 2、試行の動作上限は意味を確認した後のStep 3で指定する。試行条件と記録は`outputs/robot_trials/`へ保存し、条件を変えたら新しいsessionを作る。session内の収録YAMLと起動コードは実行時の写しとして残す。推論用の`.venvs/`もGitには含めず、移設時にはcheckpoint一式とキャッシュを別途引き継ぐ。

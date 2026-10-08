@@ -30,3 +30,7 @@ config/hardware-local.yaml
 
 # Upstream checkout created by setup.sh (tracked separately upstream)
 /lerobot_trossen/
+
+# Separate inference environments and deployment checkpoints
+/.venvs/
+/models/

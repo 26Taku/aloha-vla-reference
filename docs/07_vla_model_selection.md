@@ -35,15 +35,15 @@
 
 ## 2. この教材で扱うVLAの経路
 
-ここでは**画像と指示文から行動を生成するVLA**のうち、本教材で具体的な接続手順を用意した三つの系統を取り上げます。VLA全体の代表三選や性能順位ではありません。SmolVLAとLeRobot版π₀.₅は学習とオフライン推論を通す経路、OpenVLAから派生したOFTは異なるデータ形式の学習ローダへ接続する経路です。この違いを体験できることを選定理由にしています。固定作業の模倣だけが目的なら、最後の[非VLAの参考節](#7-もっと知りたい人へ関連する非vlaと汎用方策)も見てください。
+ここでは**画像と指示文から行動を生成するVLA**のうち、本教材で具体的な接続手順を用意した三つの系統を取り上げます。VLA全体の代表三選や性能順位ではありません。SmolVLAとLeRobot版π₀.₅は既存のLeRobot v3収録データを直接使える経路です。OFTはALOHA向けの公開手順があり、別の実行系へ変換して短い学習と保存済みモデルの推論まで接続する経路です。既存データの再利用と、行動表現・実行系を変える際の作業を比較できることを選定理由にしています。候補ごとの保留理由と再検討条件は[10の第2節](10_stack_decisions_and_extension.md)に整理しています。固定作業の模倣だけが目的なら、最後の[非VLAの参考節](#7-もっと知りたい人へ関連する非vlaと汎用方策)も見てください。
 
 | この教材で扱う系統 | 理解できる違い | `aloha_vla_demo`からの次の作業 |
 |---|---|---|
-| **SmolVLA** | 比較的小さなVLAで、画像・指示文・状態がどう行動生成へ渡るか理解する | [08の第二実習](08_vla_training_inference.md)で学習とオフライン推論 |
-| **π₀→π₀.₅** | VLMと行動生成部分の組合せ、多様な環境への汎化を学ぶ | [08の主実習](08_vla_training_inference.md)でLeRobot版π₀.₅を学習。重みの利用条件と正規化統計を確認 |
-| **OpenVLA→OpenVLA-OFT** | 元の基盤モデルの行動表現を、後続研究がどう変えたかを学ぶ | [09](09_openvla_oft_data_bridge.md)でv3からHDF5・RLDSを経て専用ローダまで接続。学習は別途 |
+| **SmolVLA** | 比較的小さなVLAで、画像・指示文・状態がどう行動生成へ渡るか理解する | [08の第二実習](08_vla_training_inference.md)で学習とオフライン推論、[11](11_robot_policy_execution.md)で実機の成功例と調整点 |
+| **π₀→π₀.₅** | VLMと行動生成部分の組合せ、多様な環境への汎化を学ぶ | [08の主実習](08_vla_training_inference.md)でLeRobot版π₀.₅を学習。[11](11_robot_policy_execution.md)で実機接続と失敗・制約を確認 |
+| **OpenVLA→OpenVLA-OFT** | 元の基盤モデルの行動表現を、後続研究がどう変えたかを学ぶ | [09](09_openvla_oft_data_bridge.md)でv3からHDF5・RLDSを経て専用ローダへ接続し、第5節で短い学習・保存・再読込を確認 |
 
-**基盤モデル**は追加データで新しい作業に合わせる出発点、**fine-tuning**はその重みを手元のデモで更新することです。OpenVLA-OFTはOpenVLAの発展研究なので、OpenVLAと二つの独立候補として数えません。**action chunk**は未来の複数時刻の指令をまとめて予測する出力です。指示文を入力できても、少数のデモだけで未知の指示に対応するとは限りません。
+**基盤モデル**は追加データで新しい作業に合わせる出発点、**fine-tuning**はその重みを手元のデモで更新することです。OpenVLA-OFTはOpenVLAの発展研究なので、本教材では元のOpenVLAとOFTを同じ基盤からの別経路として扱います。元の離散行動出力とOFTの連続行動・chunkでは、実行条件を別々に照合します。**action chunk**は未来の複数時刻の指令をまとめて予測する出力です。指示文を入力できても、少数のデモだけで未知の指示に対応するとは限りません。
 
 ### 2.1 学習へ接続するときの確認点
 
@@ -51,13 +51,13 @@
 |---|---|---|
 | SmolVLA / LeRobot | `lerobot[smolvla]`の追加依存、画像feature、state/actionの次元。個別に最新版`transformers`を導入するとlockの依存と衝突しうる | [08](08_vla_training_inference.md)でデータから入力特徴を構成し、保存したcheckpointから行動を読む |
 | π₀.₅ / LeRobot | PaliGemmaの利用条件と認証、`q01`・`q99`統計、`accelerate`、GPUメモリ | [08](08_vla_training_inference.md)で学習・checkpoint再読込・オフライン推論 |
-| OpenVLA-OFT / 専用実装 | v3からRLDSへの変換、dataset名の登録、公開ALOHA設定の3画像、収録fpsと行動列長 | [09](09_openvla_oft_data_bridge.md)で1 episodeを変換し学習ローダから読む。重みの学習は含まない |
+| OpenVLA-OFT / 専用実装 | v3からRLDSへの変換、dataset名の登録、公開ALOHA設定の3画像、収録fpsと行動列長 | [09](09_openvla_oft_data_bridge.md)で1 episodeの変換を確かめ、全episodeの変換・短い学習・checkpoint推論へ進む |
 
 この比較は**自分のデータを入力できるか**の判断です。モデルの成功率の順位ではありません。4視点の画像が保存され、policy設定に4画像が並んでも、それぞれの視点が成績に寄与した証拠にはなりません。
 
 ### 2.2 何を学んで次へ進むか
 
-まず[08](08_vla_training_inference.md)のπ₀.₅でデータ読込、重み取得、学習、checkpointの再読込を通します。利用できるGPUや認証条件で難しい場合、SmolVLAの第二実習から始めても構いません。基盤モデルの行動表現を変更したいならOpenVLAとOFTの論文を比較し、[09](09_openvla_oft_data_bridge.md)で学習プログラムへデータを届ける道筋を確かめます。どの経路もオフラインのactionが出ただけで実機のタスク成功とは判断しません。
+今回の双腕タスクで成功した構成を最初の実例にしたい場合、[08のSmolVLA実習](08_vla_training_inference.md)と[11の実機記録](11_robot_policy_execution.md)を使います。π₀.₅のデータ読込・重み取得・学習・checkpoint再読込も08に用意しています。章の配置は性能順位ではありません。基盤モデルの行動表現を変更したいならOpenVLAとOFTの論文を比較し、[09](09_openvla_oft_data_bridge.md)で学習プログラムへデータを届ける道筋を確かめます。どの経路もオフラインのactionが出ただけで実機のタスク成功とは判断しません。
 
 ---
 
@@ -90,8 +90,8 @@
 
 | 出発点と参考研究 | 研究グループが主に変えたもの | この研究を読むと役立つ場面 | ALOHA教材からの距離 |
 |---|---|---|---|
-| [SmolVLA](https://arxiv.org/abs/2506.01844) ＋ [非同期推論](https://huggingface.co/docs/lerobot/main/en/async)、[RTC](https://huggingface.co/docs/lerobot/main/en/rtc) | 前者は予測と実行を分離し、後者は前後のaction chunkのつながりを扱う。**後継基盤モデルではなく推論側の拡張** | オフラインでactionが出た後、実機で計算待ちやchunk境界のぎくしゃくが問題になる場合 | 08はオフライン推論まで。固定LeRobot 0.6.0で、現行mainのRTC機能が同一に使えるとは仮定しない |
-| [π₀](https://arxiv.org/abs/2410.24164) → [π₀-FAST](https://www.pi.website/research/fast)、[π₀.₅](https://arxiv.org/abs/2504.16054) → [π*₀.₆ / RECAP](https://www.pi.website/blog/pistar06) | FASTは行動トークン化の別経路、π₀.₅は開いた環境への汎化、RECAPはデモ・自律試行・介入を使う経験からの改善 | 行動表現、事前学習の汎化、失敗後の介入データという**別々の研究目的**を選ぶ場合 | 08で行うのはLeRobot版π₀.₅の3-step。RECAPを同じCLIで実行できるという意味ではない |
+| [SmolVLA](https://arxiv.org/abs/2506.01844) ＋ [非同期推論](https://huggingface.co/docs/lerobot/main/en/async)、[RTC](https://huggingface.co/docs/lerobot/main/en/rtc) | 前者は予測と実行を分離し、後者は前後のaction chunkのつながりを扱う。**後継基盤モデルではなく推論側の拡張** | オフラインでactionが出た後、実機で計算待ちやchunk境界のぎくしゃくが問題になる場合 | 08はオフライン推論、11は非同期実機接続を扱う。RTCの実機検証はしていない。固定LeRobot 0.6.0で、現行mainのRTC機能が同一に使えるとは仮定しない |
+| [π₀](https://arxiv.org/abs/2410.24164) → [π₀-FAST](https://www.pi.website/research/fast)、[π₀.₅](https://arxiv.org/abs/2504.16054) → [π*₀.₆ / RECAP](https://www.pi.website/blog/pistar06) | FASTは行動トークン化の別経路、π₀.₅は開いた環境への汎化、RECAPはデモ・自律試行・介入を使う経験からの改善 | 行動表現、事前学習の汎化、失敗後の介入データという**別々の研究目的**を選ぶ場合 | 08にはLeRobot版π₀.₅の3-step接続確認と20K checkpointの確認記録がある。RECAPを同じCLIで実行できるという意味ではない |
 | [OpenVLA](https://proceedings.mlr.press/v270/kim25c.html) → [OpenVLA-OFT](https://arxiv.org/abs/2502.19645) | 離散action tokenを出す基盤モデルに対し、並列デコード、連続行動表現、action chunk、微調整目的を検討 | 高頻度の双腕操作やaction headの研究を始める際、**OFT研究グループが旧方式のどこを変えたか**を学べる | OFTのALOHA例は3画像＋RLDS。本教材のv3/4画像から変換が必要 |
 | [π₀](https://arxiv.org/abs/2410.24164) → [ForceVLA](https://github.com/ft-robotic/ForceVLA) | 外部グループがπ₀とopenpiを基に力覚を組み込む。**π₀.₅の直接拡張と混同しない** | 力覚を単に記録する段階から、行動生成の条件として使う研究へ進む場合 | 03・06の力覚同期はモデル入力まで通した実績ではない。独自のセンサデータ、表現と学習経路が要る |
 | [π₀.₅](https://arxiv.org/abs/2504.16054) → [OptimusVLA](https://github.com/iLearn-Lab/CVPR26-OptimusVLA) | 外部グループがπ₀.₅を起点に時間的な記憶を加える方向を検討 | 1枚の現在画像だけでは足りない長い操作や時間的整合性を研究する場合 | OptimusVLA公開コードは本教材のLeRobot移植版と同一ではない。追加依存とチェックポイントの取り扱いを確認 |
@@ -105,19 +105,19 @@
 | 関心のある機能 | 公開研究の例 | 本教材との接続点と追加で確認すること |
 |---|---|---|
 | 力覚や触覚を行動生成に使う | [ForceVLA](https://github.com/ft-robotic/ForceVLA)はπ₀と`openpi`を基に力覚を扱う例。π₀.₅へそのまま追加できる機能ではない | [03](03_architecture_and_extension.md)はセンサの収録・同期まで。[08の第4節](08_vla_training_inference.md)でdatasetからモデル入力までの確認箇所を示す。モデル内部の融合は公開研究のコードを別途調べる |
-| 行動表現や汎化を調べる | [π₀.₅](https://arxiv.org/abs/2504.16054)は異種データによる汎化、[OpenVLA-OFT](https://arxiv.org/abs/2502.19645)は行動復号やfine-tuning方法を検討した例 | 08はLeRobot版π₀.₅、09はOFTローダまで。公開実装へ進む場合はデータ形式、視点、action表現、専用実行系を確認する |
+| 行動表現や汎化を調べる | [π₀.₅](https://arxiv.org/abs/2504.16054)は異種データによる汎化、[OpenVLA-OFT](https://arxiv.org/abs/2502.19645)は行動復号やfine-tuning方法を検討した例 | 08はLeRobot版π₀.₅、09はデータ変換から短い学習・checkpoint推論まで。公開実装へ進む場合はデータ形式、視点、action表現、専用実行系を確認する |
 
 二つの用途は重なる場合もあります。公開された発展研究の存在は、変更を手元のALOHAで再現できた証拠にはなりません。
 
 ### 拡張の「公式の入口」と研究の境界
 
-LeRobotの[Bring Your Own Hardware](https://huggingface.co/docs/lerobot/main/integrate_hardware)は、ロボットの`observation_features`と`get_observation()`の対応や、camera/robotプラグインによる観測追加の入口を説明しています。[LeRobotDataset v3](https://huggingface.co/docs/lerobot/lerobot-dataset-v3)は複数カメラと多様な時系列観測の保存・読込形式です。[Robot Processor](https://huggingface.co/docs/lerobot/implement_your_own_processor)は入力変換の拡張点です。これらは**記録・入力整形のAPI**であり、任意の力覚や触覚を既存VLAの事前学習済み重みが意味のある情報として使う標準レシピではありません。[Trossen統合の現行README](https://github.com/TrossenRobotics/lerobot_trossen)には関節effort等の収録オプションが見られますが、本教材で使用する`a4336933`に同じ機能があるかは未確認です。外付けの力覚センサとも区別してください。
+LeRobotの[Bring Your Own Hardware](https://huggingface.co/docs/lerobot/main/integrate_hardware)は、ロボットの`observation_features`と`get_observation()`の対応や、camera/robotプラグインによる観測追加の入口を説明しています。[LeRobotDataset v3](https://huggingface.co/docs/lerobot/lerobot-dataset-v3)は複数カメラと多様な時系列観測の保存・読込形式です。[Robot Processor](https://huggingface.co/docs/lerobot/implement_your_own_processor)は入力変換の拡張点です。これらは**記録・入力整形のAPI**であり、任意の力覚や触覚を既存VLAの事前学習済み重みが意味のある情報として使う標準レシピではありません。[固定版Trossenのconfig](https://github.com/TrossenRobotics/lerobot_trossen/blob/a4336933f34192a3daa7e9fb52674284bb5ae48e/packages/lerobot_robot_trossen/src/lerobot_robot_trossen/config_widowxai_follower.py)にも`include_effort`・`include_external_effort`が存在します。ただし、モータ側の推定値と外付けの力覚センサは別です。取得フラグがあることは、既存VLAがその値を利用する学習経路や効果が検証済みであることを意味しません。
 
 03の収録と同期までは教材の既存経路です。モデル内の融合位置、学習目的、実機での利用は研究設計です。後者はForceVLAなどの研究グループが公開した論文・コードを**参考事例**として示し、汎用手順としての動作を保証しません。
 
 ## 5. OpenVLA-OFTの公開実装を参照する
 
-OpenVLAの行動表現や微調整法を変更したい場合は、OFTの[論文](https://arxiv.org/abs/2502.19645)と[ALOHA実装](https://github.com/moojink/openvla-oft/blob/main/ALOHA.md)を読みます。研究の起点はOpenVLAで、OFTはその発展例です。収録済みデータから変換して学習用ローダへ渡す[09の演習](09_openvla_oft_data_bridge.md)で、LeRobot内の二つの実習と何が異なるかを確かめられます。09は重みの学習や実機制御を含みません。
+OpenVLAの行動表現や微調整法を変更したい場合は、OFTの[論文](https://arxiv.org/abs/2502.19645)と[ALOHA実装](https://github.com/moojink/openvla-oft/blob/main/ALOHA.md)を読みます。研究の起点はOpenVLAで、OFTはその発展例です。収録済みデータから変換して学習用ローダへ渡す[09の演習](09_openvla_oft_data_bridge.md)で、LeRobot内の二つの実習と何が異なるかを確かめられます。09第5節では短い学習とcheckpoint推論も扱います。実機制御とタスク性能は別の検証項目です。
 
 ## 6. ほかのVLA・実行系（参考）
 
@@ -167,4 +167,4 @@ Trossenの[学習・評価の公式案内](https://docs.trossenrobotics.com/tros
 
 ---
 
-**調査時点**：2026-09-30。モデルや公式実装は更新されるため、実行時は論文だけでなく、公式リポジトリのrelease・commit・checkpoint revisionも併記する。
+**調査時点**：関連研究一覧は2026-09-30。2026-10-06に候補選定の補足を[10](10_stack_decisions_and_extension.md)へ追加しました。モデルや公式実装は更新されるため、実行時は論文だけでなく、公式リポジトリのrelease・commit・checkpoint revisionも併記する。

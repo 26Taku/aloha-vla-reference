@@ -56,7 +56,7 @@ flowchart LR
 ### 作業前の安全確認
 
 - Follower Armの周囲から、人、工具、配線、壊れやすい物を退避する。
-- Armを大きく動かす前に、現地の装置で使える停止手段と操作方法を確認する。`Ctrl+C`はプログラムの終了操作であり、即時停止とは異なる。固定版のFollowerは接続時・終了時にも所定姿勢へ移動するため、その経路と周辺空間も確認する（[11の開始・終了動作](11_robot_policy_execution.md)）。
+- 通常終了には`Ctrl+C`を使う。Followerは終了処理で初期位置へ戻るため、戻り終わってターミナルのプロンプトが表示されるまで待つ。
 - 起動直後はFollowerが追従し始めるまでLeaderを現在位置付近で保持する。
 - error後にControllerの電源を切る場合は、保持力を失うArmを手で支持する。
 - 不明な挙動を繰り返して確認せず、停止して[04 Troubleshooting](04_troubleshooting.md)で切り分ける。
@@ -111,19 +111,19 @@ source ./scripts/session.sh
 ./setup.sh
 ```
 
-ZIPで受け取った場合は展開し、`README.md`と`setup.sh`があるdirectoryへ移動して、`source ./scripts/session.sh`、`./setup.sh`の順に実行する。新しい端末では、下の「作業場所の設定」を行う。
+新しいターミナルでは、下の「作業場所の設定」を行う。
 
 ### 作業場所の設定
 
-コマンド例はUbuntuのbashを想定する。上の取得・セットアップ手順では、`source ./scripts/session.sh`で教材の場所を表す`REPO`を自動設定している。同じ端末で続ける場合は再実行不要である。
+コマンド例はUbuntuのbashを想定する。上の取得・セットアップ手順では、`source ./scripts/session.sh`で教材の場所を表す`REPO`を自動設定している。同じターミナルで続ける場合は再実行不要である。
 
-新しい端末で作業を再開するときは、`README.md`と`setup.sh`がある教材のルートディレクトリへ移動し、次を実行する。教材を再取得したり、`setup.sh`を毎回実行したりする必要はない。
+新しいターミナルで作業を再開するときは、`README.md`と`setup.sh`がある教材のルートディレクトリへ移動し、次を実行する。教材を再取得したり、`setup.sh`を毎回実行したりする必要はない。
 
 ```bash
 source ./scripts/session.sh
 ```
 
-これは現在の端末にパスを用意するだけで、インストール・収録・ファイル作成は行わない。`source`は設定を現在の端末に残すために使う。以後は`cd "$REPO"`で教材ルートへ戻れる。新しい端末ではこの設定を行い直す。
+これは現在のターミナルにパスを用意するだけで、インストール・収録・ファイル作成は行わない。`source`は設定を現在のターミナルに残すために使う。以後は`cd "$REPO"`で教材ルートへ戻れる。新しいターミナルではこの設定を行い直す。
 
 収録データの入力先は、データが用意できた後に[08](08_vla_training_inference.md#学習に使うデータの場所を指定する)で指定する。OpenVLA-OFT用の作業場所は、その経路を試す場合に[09](09_openvla_oft_data_bridge.md)で確認する。ここで指定する必要はない。機器のIP・serial・topic・deviceも、それぞれを使う手順で確認・入力する。
 
@@ -168,7 +168,7 @@ cd "$REPO"
 ip -br addr
 ```
 
-標準構成では、Armと通信するinterfaceに`192.168.1.x/24`のaddressが必要である。次にControllerを検出する。
+標準構成では、Armと通信するinterfaceに`192.168.1.x/24`のaddressが必要である。これは02で変更する学習設定ではなく、PCと実機の接続設定である。このaddressが見つからない場合は、次の探索へ進む前に[Trossen公式のSoftware Setup](https://docs.trossenrobotics.com/trossen_arm/main/getting_started/software_setup.html)のネットワーク設定を行い、再度`ip -br addr`で確認する。例の`eno1`は機器ごとに異なるinterface名なので、その名前自体へ合わせる必要はない。次にControllerを検出する。
 
 例えば、次のような行が表示された場合、`eno1`というnetwork interfaceに`192.168.1.1/24`が設定されている。
 
@@ -380,7 +380,7 @@ git check-ignore -v config/hardware-local.yaml
 - 4画面が、上方・低位置・左右手首の正しい画角である。
 - 不自然な振動、急な移動、連続errorがない。
 
-通常のプログラム終了は`Ctrl+C`で行う。終了処理にもアームの移動を伴うため、周辺空間を確保してから操作する。危険時の即時停止には、事前に確認した装置の停止手段を使う。
+通常終了は`Ctrl+C`で行う。Followerが初期位置へ戻り、ターミナルのプロンプトが表示されれば終了である。
 
 ### なぜ起動直後に待つのか
 

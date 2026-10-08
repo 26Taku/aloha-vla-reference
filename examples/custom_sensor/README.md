@@ -24,7 +24,7 @@ CAMERA_TIMESTAMP_JSONL="$SENSOR_DIR/camera_timestamps.jsonl"
 CAMERA_ALIGNMENT_JSONL="$SENSOR_DIR/camera_alignment.jsonl"
 ```
 
-`ROBOT_FRAMES`は下の収録例に対応する。別Datasetやepisodeを使う場合は、`read -r -p "Robot timestamp JSONL: " ROBOT_FRAMES`で入力先だけを一度変更する。cameraの収録は[camera資料](camera/README.md)を参照し、出力videoとtimestampのパスを両資料で揃える。設定値は同じ端末内で有効で、新しい端末では再設定する。出力名は例なので、別試行では新しい名前を選ぶ。
+`ROBOT_FRAMES`は下の収録例に対応する。別Datasetやepisodeを使う場合は、`read -r -p "Robot timestamp JSONL: " ROBOT_FRAMES`で入力先だけを一度変更する。cameraの収録は[camera資料](camera/README.md)を参照し、出力videoとtimestampのパスを両資料で揃える。設定値は同じターミナル内で有効で、新しいターミナルでは再設定する。出力名は例なので、別試行では新しい名前を選ぶ。
 
 ## 1. Script map
 

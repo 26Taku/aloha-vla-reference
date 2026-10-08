@@ -23,7 +23,7 @@
 
 ### 2.1 serverとclientを分ける
 
-非同期推論では、**serverがモデルを読み込み、画像・stateからactionを生成**し、**clientがロボットとカメラを扱い、観測を送ってactionを実行**します。モデルは1回の推論で複数時刻のaction（action chunk）をまとめて出し、clientが順番に実行します。今回の実機検証は同じPCの2端末で行いました。学習PCからネットワーク越しにロボットを動かした例ではありません。
+非同期推論では、**serverがモデルを読み込み、画像・stateからactionを生成**し、**clientがロボットとカメラを扱い、観測を送ってactionを実行**します。モデルは1回の推論で複数時刻のaction（action chunk）をまとめて出し、clientが順番に実行します。今回の実機検証は同じPCの2つのターミナルで行いました。学習PCからネットワーク越しにロボットを動かした例ではありません。
 
 収録用の環境にはTrossenプラグインとカメラの依存、推論用の環境にはモデルとGPUの依存が必要です。GPUに合わせて推論環境を調整しても、動作確認済みの収録環境を一緒に更新しない構成にしました。別PC構成へ変更する場合は、localhostの置換だけでなく通信遅延・切断時の動作も確認します。
 
@@ -92,15 +92,15 @@ printf '推論Python: %s\n' "$INFER_PY"
 
 14次元のshapeが合っていても、左右・順序・単位は保証されません。また、driverの初期位置と収録開始姿勢は必ずしも一致しません。デモ収録時の開始姿勢と、接続・終了時の姿勢移動を確認します。
 
-clientの起動・終了にも姿勢移動があります。今回のCtrl+Cでは初期位置への復帰が見られました。**Ctrl+Cは、この構成では移動を伴う終了であり、その場での即時停止ではありません。** 接続・終了時の経路と、現地で使用できる停止手段を担当者と確認してからclientを起動します。
+通常終了はclient側の`Ctrl+C`です。今回の構成では初期位置へ戻った後に終了するので、復帰が終わりターミナルのプロンプトが表示されるまで待ちます。標準の机・機体配置を前提に、机の上から工具などを片付けて実行します。
 
-## 3. 標準の保存先を使い、同じPCの2端末で起動する
+## 3. 標準の保存先を使い、同じPCの2つのターミナルで起動する
 
 以下はUbuntuのbash用です。02で設定した`REPO`と`DATASET`を使います。標準構成ならパスを書き換える必要はありません。参照先の確認→GPUとオフライン推論の確認→試行上限の説明と入力→server/client起動の順に進めます。独自の配置を使う場合の上書き方法はStep 1にまとめています。
 
 ### Step 1：モデルとファイルの参照先を確認する
 
-08の第7.2節まで同じPCで進めた場合、学習結果をコピーし直す必要はありません。11は次の場所を直接参照します。`OUTPUTS`を08で変更している場合も、その変数を引き継ぎます。新しい端末では08と同じ`DATASET`・`OUTPUTS`を設定してください。
+08の第7.2節まで同じPCで進めた場合、学習結果をコピーし直す必要はありません。11は次の場所を直接参照します。`OUTPUTS`を08で変更している場合も、その変数を引き継ぎます。新しいターミナルでは08と同じ`DATASET`・`OUTPUTS`を設定してください。
 
 | 内容 | 標準の参照先 |
 |---|---|
@@ -110,6 +110,8 @@ clientの起動・終了にも姿勢移動があります。今回のCtrl+Cで�
 | client Python | `$REPO/lerobot_trossen/.venv/bin/python` |
 | 推論Python | `$REPO/.venvs/vla-inference/bin/python` |
 | Hugging Faceキャッシュ | `HF_HUB_CACHE`、または通常の`~/.cache/huggingface/hub`（`HF_HOME`も参照） |
+
+このcheckpointの保存先は、08の第7.2節で`OUT="$OUTPUTS/${POLICY_TYPE}_4cam_20k"`と指定した結果です。LeRobotがすべての学習で自動的にこの名前を付けるわけではありません。第2・3節の短い学習は別の保存先を使います。日付やbatch数を含む独自名で学習した場合は、下の入力でそのcheckpointを参照します。
 
 02のデータ名`aloha_vla_demo`なら、収録YAMLは`record-aloha_vla_demo.yaml`です。このファイルから実機の接続・カメラ設定とtask文を引き継ぎます。別PCで学習した場合は、checkpoint一式と必要なキャッシュを実機PCへ転送し、実機PCで収録に使ったYAMLを指定します。
 
@@ -130,7 +132,7 @@ source "$REPO/scripts/policy_session.sh"
 
 **既存の学習結果が別名・別の場所にある場合だけ**、次を実行します。`pretrained_model`まで含む絶対パスを入力します。モデル名に対応するローカル設定へ保存するため、次回のsourceでも再利用できます。
 
-入力例（端末表示の例。次のパス自体を実行するものではありません）：
+入力例（ターミナル表示の例。次のパス自体を実行するものではありません）：
 
 ```text
 既存のpretrained_modelの絶対パス: /home/student/aloha-vla-reference/outputs/pi05_4cam_b8_20k_20261005_190207/checkpoints/020000/pretrained_model
@@ -147,18 +149,62 @@ printf 'export CHECKPOINT=%q\n' "$CHECKPOINT" \
 
 `last/pretrained_model`は最新保存checkpointへの参照です。評価条件を固定するため、本章では`020000/pretrained_model`のようにstepを明示した場所を使います。ファイル名を標準形へ変更したり、学習し直したりする必要はありません。
 
-**推論Pythonが別の場所にある場合だけ**、次のように指定します。`RECORD_CFG`や`MODEL_CACHE`も独自の配置なら同じ方法で上書きできます。
+**別PCで学習したモデルを使う場合、または既存の推論環境を使う場合**は、次の4項目も確認します。転送したファイルと利用する環境が、実機PCのどこにあるかを指定します。標準の参照先を使う項目はEnterだけで現在の値を保持できます。
+
+| 項目 | 入力するもの |
+|---|---|
+| 収録YAML | 02の収録時に生成した`.runtime/record-<データ名>.yaml`。ロボットの接続とtask文を引き継ぐ |
+| 推論Python | モデルを動かす環境の`bin/python`。第2.1節で新規作成済みならその値を保持する |
+| client Python | ロボットを操作する環境の`bin/python`。通常は教材内の`lerobot_trossen/.venv/bin/python` |
+| モデルキャッシュ | Hugging Faceキャッシュの`hub`ディレクトリ。通常は`~/.cache/huggingface/hub`。独自名のキャッシュでも`models--…`が格納された親ディレクトリを指定する |
+
+例えば収録YAMLと推論環境だけが別の場所にある場合は、次のように入力します。`（Enter）`は入力せず、その行ではEnterキーだけを押します。
 
 ```text
-既存の推論Pythonの絶対パス: /home/student/vla-inference/.venv/bin/python
+収録YAML（Enterで現在値を使用）: /mnt/aloha/aloha-vla-reference/.runtime/record-yellow_ball_box_demo.yaml
+推論Python（Enterで現在値を使用）: /mnt/aloha/inference/.venv/bin/python
+client Python（Enterで現在値を使用）: （Enter）
+モデルキャッシュ（Enterで現在値を使用）: （Enter）
 ```
 
 ```bash
-read -r -p "既存の推論Pythonの絶対パス: " INFER_PY
-export INFER_PY
+printf '収録YAML: %s\n推論Python: %s\nclient Python: %s\nキャッシュ: %s\n' \
+  "$RECORD_CFG" "$INFER_PY" "$CLIENT_PY" "$MODEL_CACHE"
+read -r -p "収録YAML（Enterで現在値を使用）: " INPUT_PATH
+export RECORD_CFG="${INPUT_PATH:-$RECORD_CFG}"
+read -r -p "推論Python（Enterで現在値を使用）: " INPUT_PATH
+export INFER_PY="${INPUT_PATH:-$INFER_PY}"
+read -r -p "client Python（Enterで現在値を使用）: " INPUT_PATH
+export CLIENT_PY="${INPUT_PATH:-$CLIENT_PY}"
+read -r -p "モデルキャッシュ（Enterで現在値を使用）: " INPUT_PATH
+export MODEL_CACHE="${INPUT_PATH:-$MODEL_CACHE}"
+unset INPUT_PATH
 ```
 
-入力するのはパスの文字列だけです。引用符を付けず、Enterで確定します。`export`は通常、何も表示しません。繰り返し使うPython・キャッシュなどのパスは、`.runtime/policy-local.sh`に`export`行として保存できます。checkpointの設定はモデル別の`policy-checkpoint-<モデル名>.sh`に分けています。これらはローカル設定でありGitには含めません。
+入力するのはパスの文字列だけです。引用符を付けず、Enterで確定します。`export`は通常、何も表示しません。入力後、次で必要なファイルが存在することを確認します。標準の参照先を使う場合も実行してください。
+
+```bash
+if test -f "$RECORD_CFG" && test -f "$CHECKPOINT/config.json" &&
+   test -f "$DATASET/meta/info.json" && test -x "$INFER_PY" &&
+   test -x "$CLIENT_PY" && test -d "$MODEL_CACHE"; then
+  printf '%s\n' 'PATH CHECK: PASS'
+else
+  printf '%s\n' 'PATH CHECK: FAIL — 表示された参照先と入力を見直してください'
+fi
+```
+
+**完了条件**：`PATH CHECK: PASS`。FAILならこのStep内で参照先を指定し直します。DatasetはStep 2のオフライン確認にも使います。実機PCにない場合はディレクトリ全体を転送し、[08冒頭](08_vla_training_inference.md#学習に使うデータの場所を指定する)の入力で`DATASET`を指定します。
+
+独自パスを繰り返し使う場合だけ、次を実行して保存します。標準パスだけなら不要です。既存の`policy-local.sh`は以下の4項目に置き換わります。
+
+```bash
+mkdir -p "$REPO/.runtime"
+for name in RECORD_CFG INFER_PY CLIENT_PY MODEL_CACHE; do
+  printf 'export %s=%q\n' "$name" "${!name}"
+done > "$REPO/.runtime/policy-local.sh"
+```
+
+次回は`policy_session.sh`をsourceすると読み込まれます。checkpointは先ほどのモデル別ファイルで保持します。モデルごとに別キャッシュを使っている場合は、モデル切替後にこのStepで`MODEL_CACHE`を指定し直してください。別Datasetの収録YAMLを使う場合も`RECORD_CFG`を指定し直します。ローカル設定はGitへ登録されません。
 
 ### Step 2：GPU・依存・入力を確認する（ロボット非接続）
 
@@ -234,7 +280,35 @@ CUDA_VISIBLE_DEVICES="$GPU_UUID" HF_HUB_CACHE="$MODEL_CACHE" \
   --checkpoint "$CHECKPOINT" --output "$INSPECTION" --episodes 1
 ```
 
-両方で`RECORDED-FRAME CHECK: PASS`が目安です。画像で4視点の対応、CSVで前後処理後のactionを確認します。このPASSは実機のカメラ対応やタスク成功を保証しません。ここまで通ってから、最初の実機確認の条件を決めます。
+両方で`RECORDED-FRAME CHECK: PASS`が目安です。続けて、最後の確認で生成した`summary.json`とcheckpoint設定を表示します。次の操作はファイルを読むだけで、ロボットには接続しません。
+
+```bash
+"$CLIENT_PY" -m json.tool "$INSPECTION/summary.json"
+"$CLIENT_PY" -m json.tool "$CHECKPOINT/config.json"
+cat "$RECORD_CFG"
+```
+
+| 表示結果の見る場所 | 本教材の標準構成で一致させる内容 |
+|---|---|
+| `summary.json`の`action_names`と`state_names` | どちらも左6関節→左gripper→右6関節→右gripperの14項目。下の名前と並びを照合する |
+| `summary.json`の`input_features` | `observation.state`と、`observation.images.cam_high`／`cam_low`／`cam_left_wrist`／`cam_right_wrist`の4画像 |
+| checkpointの`type` | 選択した`POLICY_TYPE`と同じ`smolvla`または`pi05` |
+| π₀.₅の`use_relative_actions` | 今回の絶対関節目標の学習なら`false`。SmolVLAにこの項目がないこと自体は異常ではない |
+| 収録YAMLの`robot.cameras`と左右の`ip_address` | 02で画像・実物と対応付けたカメラ名、serial、左右FollowerのIP。学習PCの設定へ置き換えない |
+| 収録YAMLの`dataset.single_task` | 学習に使用したデモの指示文。今回の確認中に別の作業へ書き換えない |
+
+標準の14項目は次の順序です。左右gripperの名前に`left`が重複する箇所も、固定プラグインの名称どおりです。
+
+```text
+left_joint_0.pos ～ left_joint_5.pos, left_left_carriage_joint.pos,
+right_joint_0.pos ～ right_joint_5.pos, right_left_carriage_joint.pos
+```
+
+関節rad・gripper mは[固定Follower実装](https://github.com/TrossenRobotics/lerobot_trossen/blob/a4336933f34192a3daa7e9fb52674284bb5ae48e/packages/lerobot_robot_trossen/src/lerobot_robot_trossen/config_widowxai_follower.py)の前提です。02でそのまま収録したデータにはこの対応を使えます。外部データや独自の変換を加えたデータでは、名前とshapeだけで単位が証明されるわけではないので、取得・変換コードの単位も照合します。
+
+`INSPECTION`が示すディレクトリのJPEGを開き、各ラベルに対応する画角を02で確認した画像と比べます。`actions.csv`は表計算ソフト等で開き、`prediction`が前後処理後の予測、`recorded_action`が収録指令、`state`が収録時の位置であることを確認します。ここで数値の一致を合格条件にはしません。
+
+**完了条件**：PASSに加え、4視点・左右の並び・モデル種別・action表現・task文が上表と整合すること。不一致ならStep 1でファイル選択を見直し、再びオフライン確認します。名前のない外部データを14次元という理由だけで採用したり、順序を推測して実機へ送ったりしません。ここまで通ってから、最初の実機確認の条件を決めます。
 
 ### Step 3：最初の試行の上限を設定し、実行条件を保存する
 
@@ -249,7 +323,7 @@ CUDA_VISIBLE_DEVICES="$GPU_UUID" HF_HUB_CACHE="$MODEL_CACHE" \
 
 これは関節の絶対可動域、gripperの最大開口、速度上限の指定ではありません。指令を繰り返せば移動は積み重なり、接続・終了時の姿勢移動も別にあります。小さければ常に安全、大きければ学習動作を正しく再現する、とも限りません。今回も上限が小さい条件ではclampが続いて動作が変わり、0.1 rad条件ではπ₀.₅に激しい動作が見られました。
 
-機体の取扱いを担当者と確認し、開始・終了時に接触しない配置と停止手段を用意してから、短い確認の条件を選びます。まず上限の適用と動作を観察し、変更が必要なら一度終了して第4節に従って調整します。
+最初の試行はタスク成功率の測定ではなく、左右の上限が適用され、観測を送って動作が始まり、通常終了できるかを見る短い接続確認にします。物体を扱う前に机の上を片付け、Step 5で表示される上限と動きの向きを確認します。変更が必要ならStep 6で終了してから、第4節に従って一項目ずつ調整します。
 
 次は入力方法の例です。0.05と0.01は今回使用した条件の一つであり、すべての装置へ推奨する安全値ではありません。数字だけを入力し、単位は入力しません。
 
@@ -279,16 +353,16 @@ source "$REPO/.runtime/policy-session.sh" &&
 
 入力YAML、スクリプト、package一覧、教材とプラグインのcommitを`outputs/robot_trials/session-…/`へ保存します。以後は保存したYAMLとコードを使います。`config-check/requested_limits.json`は指定値の記録で、実機への適用証明ではありません。適用値はStep 5で確認します。
 
-### Step 4：端末Aでserverを起動する
+### Step 4：ターミナルAでserverを起動する
 
-端末A・Bとも、02と同じリポジトリのルートで次を実行します。端末ごとにパスを入力せず、最後に作成したsessionを読み込みます。別sessionを同時に扱う場合は、共通ポインタを使わず対象session内の`session.sh`を明示します。
+ターミナルA・Bとも、02と同じリポジトリのルートで次を実行します。ターミナルごとにパスを入力せず、最後に作成したsessionを読み込みます。別sessionを同時に扱う場合は、共通ポインタを使わず対象session内の`session.sh`を明示します。
 
 ```bash
 source ./scripts/session.sh
 source "$REPO/.runtime/policy-session.sh"
 ```
 
-端末Aでserverを起動します。保存コードは観測類似判定の`atol=0.01`、localhost:8080、30 Hzを使います。
+ターミナルAでserverを起動します。保存コードは観測類似判定の`atol=0.01`、localhost:8080、30 Hzを使います。
 
 ```bash
 bash "$REPO/scripts/run_with_log.sh" "$SESSION_DIR/server.log" env \
@@ -300,9 +374,9 @@ bash "$REPO/scripts/run_with_log.sh" "$SESSION_DIR/server.log" env \
 
 `PolicyServer started on 127.0.0.1:8080`の後に表示が止まるのはclient待機です。checkpointはclientから指定され、初回接続でロードされます。起動表示だけでモデルロード完了と判断しません。
 
-### Step 5：端末Bでclientを起動する（実機が動く）
+### Step 5：ターミナルBでclientを起動する（実機が動く）
 
-端末BでStep 4のsession読込を行います。周辺、開始・終了時の移動経路、停止手段を確認し、他のteleop・record・clientを終了してから実行します。
+ターミナルBでStep 4のsession読込を行います。他のteleop・record・clientを終了し、机の上の工具などを片付けてから実行します。
 
 ```bash
 RUN=$(mktemp -d "$SESSION_DIR/trial-XXXXXXXX")
@@ -316,11 +390,18 @@ bash "$REPO/scripts/run_with_log.sh" "$RUN/client.log" env PYTHONUNBUFFERED=1 \
 
 左右の`limits`表示と`client/effective_limits.json`を確認します。factoryで構成した各armへ関節別dictを設定してから接続します。保存`client.yaml`のscalarは生成時の値であり、**実行時の上限はdictの方**です。固定版と双腕WidowX AI向けなので、別のrobot・LeRobot版では構成と接続の順序を確認します。
 
-初回ロードには待ち時間があります。serverのロード・推論、clientの観測送信・指令実行を照合してください。
+初回ロードには待ち時間があります。最初の試行では、次の順でターミナル表示と動作を見ます。
+
+1. clientに左右の`limits`が表示され、`effective_limits.json`の各`joint_0`〜`joint_5`が入力した`JOINT_CAP`、carriage jointが`GRIPPER_CAP`になっていることを確認する。実効設定が違う場合はタスク試行へ進まず、実行したsessionを見直す。
+2. serverでモデルロードが進み、その後clientが観測を送ってactionを受け取るログが続くことを確認する。起動表示だけで止まる場合は第4.2節で待機・ロード・障害を切り分ける。
+3. 短い動作を見たらStep 6で終了し、初期位置へ戻ってターミナルのプロンプトが表示されること、trialの`client.log`が残ることを確認する。これは接続・通常終了の確認で、タスク成功の判定ではない。
+4. 上記が通った後、デモ収録時と同じ物体・画角・開始配置へ戻してタスクを試す。把持・輸送・受け渡し・投入のどこまで進んだか、停止や介入があったかを第5節の方法で記録する。
+
+**短い接続確認の完了条件**：実効上限が指定値と一致し、観測送信・推論・動作・通常終了とログ保存を確認できること。途中で不一致や不安定動作があれば、結果を残して第4節へ戻ります。
 
 ### Step 6：終了して次の試行を残す
 
-端末BでCtrl+Cし、終了時の姿勢移動が完了したことを確認します。serverも終了する場合はその後に端末AでCtrl+Cします。**Ctrl+C後も初期位置への移動があります。即時停止手段の代わりにはしません。**
+ターミナルBでCtrl+Cし、アームが初期位置へ戻り、ターミナルのプロンプトが表示されるまで待ちます。serverも終了する場合は、その後にターミナルAでCtrl+Cします。
 
 同じモデル・条件なら開始条件を戻し、Step 5を繰り返します。試行ごとに別の保存先ができます。上限だけを変更する場合は両プロセスを終了し、Step 3で新しい値を入力して新sessionを作ります。モデル・パス・コードを変える場合は、Step 1から対応する設定と確認をやり直します。ログの上書きを拒否するため、同じserverを再起動する場合も新しいsessionを作ってください。
 
@@ -347,7 +428,9 @@ bash "$REPO/scripts/run_with_log.sh" "$RUN/client.log" env PYTHONUNBUFFERED=1 \
 | 接近後に上下動を繰り返す、clamp警告が続く | 予測目標とclamp後の指令、実行時の上限 | 小さなscalar制限が動作を変えていた可能性。関節とgripperを分けて記録・調整 |
 | 奥行きがずれる、片指だけ触れる | 画角、開始姿勢、物体配置、収録範囲 | 画像を使っていないとは即断しない。収録範囲内で接触位置を確認 |
 | 持ち上げ・輸送中に落とす | 把持の深さ、物体・箱との接触、閉じるタイミング | 輸送中落下と受け渡し失敗を分ける。今回の端を掴むデモは原因候補であり確定原因ではない |
-| 大きく振れる、危険な動作が出る | 適用条件、停止方法、接続・終了を含む経路 | 試行を終了して記録する。上限を拡大し続けて解決しようとしない |
+| 大きく振れる、動作が不安定になる | 適用条件、入力画像、左右の対応と実効上限 | 試行を終了して記録する。上限を拡大し続けて解決しようとしない |
+
+調整が必要なら、まず失敗した試行を終了し、上の表から症状に合う一行を選びます。画像・配置の違いならデモの条件へ戻し、実効上限の違いならsessionの指定を直します。clamp警告が続く場合は`prediction`と現在位置、適用された上限を見比べ、制限が動作を変えている可能性を検討します。警告があるという理由だけで0.05から0.1へ引き上げる手順にはしません。今回の値は比較例として扱います。
 
 診断では一つずつ条件を変え、変更前後の設定と結果を対にして残します。今回の調整は、物体配置・乱数・GPU負荷を固定した対照実験ではありません。観測類似判定の変更だけ、または制限の変更だけが改善原因だったとは確定していません。
 

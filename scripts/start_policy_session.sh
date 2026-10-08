@@ -20,14 +20,10 @@ done > "$SESSION_DIR/session.sh"
 cp "$REPO/scripts/robot_policy_server.py" "$REPO/scripts/robot_policy_client.py" "$SESSION_DIR/"
 uv pip freeze --python "$INFER_PY" > "$SESSION_DIR/inference-packages.txt"
 uv pip freeze --python "$CLIENT_PY" > "$SESSION_DIR/client-packages.txt"
-if [[ -e "$REPO/.git" ]]; then
-    git -C "$REPO" rev-parse HEAD > "$SESSION_DIR/manual_commit.txt"
-    git -C "$REPO" diff -- scripts docs/11_robot_policy_execution.md > "$SESSION_DIR/manual_changes.patch"
-else
-    printf 'ZIP distribution: Git commit metadata unavailable.\n' > "$SESSION_DIR/manual_commit.txt"
-fi
+git -C "$REPO" rev-parse HEAD > "$SESSION_DIR/manual_commit.txt"
+git -C "$REPO" diff -- scripts docs/11_robot_policy_execution.md > "$SESSION_DIR/manual_changes.patch"
 git -C "$REPO/lerobot_trossen" rev-parse HEAD > "$SESSION_DIR/plugin_commit.txt"
-# Content hashes also identify the executed files in a ZIP distribution.
+# Record hashes of the config and executed code alongside the Git metadata.
 "$CLIENT_PY" -I - "$SESSION_DIR" <<'PYHASH'
 import hashlib
 import json

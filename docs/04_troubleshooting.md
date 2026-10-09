@@ -280,8 +280,8 @@ source/device timestampとhost `CLOCK_MONOTONIC` のclock domainを確認する�
 | OFTの変換・loaderで停止 | builder/OFTのPython、RLDS出力、mixture登録、固定commitとpatch | [09](09_openvla_oft_data_bridge.md) |
 | checkpointがあっても基盤重み・tokenizerを探す | 前後処理と基盤cache、参照revision、cache内symlink | [11の環境差分](11_robot_policy_execution.md#2-ロボットを動かす前に準備する) |
 | 非同期server/clientでgrpc等のimportが失敗 | 両方の実行環境に非同期依存があるか | [11](11_robot_policy_execution.md) |
-| 実機で同じ動作を繰り返す、目標がclampされる | 予測actionと切り詰め後の指令、単位、実効の関節別上限、観測類似判定 | [11の設定差分](11_robot_policy_execution.md#4-同じ場所を繰り返すときの診断) |
-| 把持後に落下、受け渡しに失敗 | 初期配置、把持の深さ、接触、前後処理、実行条件。出力finiteだけでは判定しない | [11の試行結果](11_robot_policy_execution.md#5-試行を記録し成功を定義する) |
+| 実機で同じ動作を繰り返す、目標がclampされる | 予測actionと切り詰め後の指令、単位、実効の関節別上限、観測類似判定 | [11の設定差分](11_robot_policy_execution.md#5-同じ場所を繰り返すときの診断) |
+| 把持後に落下、受け渡しに失敗 | 初期配置、把持の深さ、接触、前後処理、実行条件。出力finiteだけでは判定しない | [11の試行結果](11_robot_policy_execution.md#6-試行を記録し成功を定義する) |
 | Ctrl+C後にもarmが移動 | client終了・driver disconnectの姿勢移動。即時停止とは区別する | [11](11_robot_policy_execution.md) |
 
 実機で激しい動作がある場合、指令上限を広げて反復することを対処法にしない。確認済みの停止手段を使い、入力・出力・設定を照合してから次の試行を判断する。原因と対処の具体的な記録は各実習章に置き、本章は問題の入口として使う。

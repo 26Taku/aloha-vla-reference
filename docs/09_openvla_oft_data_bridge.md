@@ -247,7 +247,7 @@ print("OFT DATA LOADER: PASS")
 PY
 ```
 
-今回の確認ではFlash Attentionを導入せず、このローダのassertionと`OFT DATA LOADER: PASS`まで通りました。
+検証ではFlash Attentionを導入せず、このローダのassertionと`OFT DATA LOADER: PASS`まで通りました。
 
 上のコマンドが通れば、ローダから3画像、`proprio (1,14)`、`action (30,14)`が取り出せます。本章の変換・ローダ確認では`CUDA_VISIBLE_DEVICES=`でGPUを非表示にしています。確認時はTensorFlowのCUDA初期化・factory重複メッセージが出ましたが、読み戻しとローダのPASSまで完了しました。メッセージだけで成否を判断せず、自分の環境では上のassertionとプロセスの終了状態を確認してください。
 
@@ -261,7 +261,7 @@ PY
 
 ### 5.1 作業先と全episodeの変換
 
-02の作業場所と08の`DATASET`、本章の`OFT`・`BUILDER_ENV`が設定されたターミナルで実行します。`WORK`は今回の変換・重み・checkpointを保存する場所です。入力待ちになったら、未使用の保存先を入力してEnterを押してください。データ50 episodeのHDF5だけで約23.6 GB、さらにRLDS・基盤重みのキャッシュ・作業コピー・merged checkpointが必要です。空き容量に余裕のある領域を使います。
+02の作業場所と08の`DATASET`、本章の`OFT`・`BUILDER_ENV`が設定されたターミナルで実行します。`WORK`はこの作業の変換データ・重み・checkpointを保存する場所です。入力待ちになったら、未使用の保存先を入力してEnterを押してください。データ50 episodeのHDF5だけで約23.6 GB、さらにRLDS・基盤重みのキャッシュ・作業コピー・merged checkpointが必要です。空き容量に余裕のある領域を使います。
 
 ```bash
 read -r -p "追加検証の新規保存先ディレクトリ: " WORK
@@ -297,7 +297,7 @@ TF_NUM_INTEROP_THREADS=2 TF_NUM_INTRAOP_THREADS=2 \
 "$BUILDER_ENV/bin/python" "$TOOLS/verify_full_rlds.py"
 ```
 
-**完了条件**：`FULL EXPORT: PASS`と`FULL RLDS READBACK: PASS`、自分のDatasetと同じ件数。確認例は50 episode・29,947 frameです。今回のbuilderはtrainだけで、未知データの評価にはなりません。評価まで行う場合はepisode単位でholdoutを分離し、builderにvalidation splitを追加します。全件をtrainへ置いたまま`use_val_set=True`にしないでください。
+**完了条件**：`FULL EXPORT: PASS`と`FULL RLDS READBACK: PASS`、自分のDatasetと同じ件数。確認例は50 episode・29,947 frameです。付属のbuilderはtrainだけで、未知データの評価にはなりません。評価まで行う場合はepisode単位でholdoutを分離し、builderにvalidation splitを追加します。全件をtrainへ置いたまま`use_val_set=True`にしないでください。
 
 ### 5.2 基盤重みを作業用コピーへ置く
 
@@ -359,7 +359,7 @@ TF_NUM_INTEROP_THREADS=2 TF_NUM_INTRAOP_THREADS=2 \
 
 **完了条件**：各観測で有限な`(30,14)`と`OFT CHECKPOINT INFERENCE: PASS`。確認例はepisode 0のframe 0・299・597です。行動列は`.npy`、条件とshapeは`summary.json`へ保存されます。訓練観測の推論なので、汎化・実機成功率・安全性の評価にはなりません。
 
-今回の追加確認はPyTorch 2.2.0+cu121・BF16対応のRTX A6000で通りました。TensorFlowのfactory登録、CropAndResize、PEFTの保存に関する警告は出ましたが、学習と再読込は正常終了しました。警告文だけで判断せず、保存物・assertion・終了状態を確認します。
+追加検証はPyTorch 2.2.0+cu121・BF16対応のRTX A6000で通りました。TensorFlowのfactory登録、CropAndResize、PEFTの保存に関する警告は出ましたが、学習と再読込は正常終了しました。警告文だけで判断せず、保存物・assertion・終了状態を確認します。
 
 ## 6. 研究用の学習へ広げる前に
 
